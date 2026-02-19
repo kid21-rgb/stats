@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Basketball Stats Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#ea580c">
+  <style>body{margin:0;font-family:system-ui,-apple-system,sans-serif}*{box-sizing:border-box}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef}=React;
+const storage={async get(k){try{const v=localStorage.getItem(k);return v?{key:k,value:v}:null}catch(e){return null}},async set(k,v){try{localStorage.setItem(k,v);return{key:k,value:v}}catch(e){return null}},async delete(k){try{localStorage.removeItem(k);return{key:k,deleted:true}}catch(e){return null}},async list(p){try{const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(p))keys.push(k)}return{keys}}catch(e){return{keys:[]}}}};
+
+const Plus=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const Eye=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+const ArrowLeft=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
+const ArrowUp=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>;
+const ArrowDown=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>;
+const ChevronsUp=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>;
+const ChevronUp=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>;
+const ChevronDown=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>;
+const Undo=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>;
+const Trash2=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>;
+const X=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const Moon=({size=24,className=''})=><svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>;
+const Sun=({size=24,className=''})=><svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
+const Edit2=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+const Download=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+
+const BasketballStatsApp = () => {
+  const [screen, setScreen] = useState('home');
+  const [games, setGames] = useState([]);
+  const [currentGame, setCurrentGame] = useState(null);
+  const [currentPeriod, setCurrentPeriod] = useState(1);
+  const [gameLog, setGameLog] = useState([]);
+  const [filterPeriod, setFilterPeriod] = useState('Total');
+  const [lastStat, setLastStat] = useState(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const [shotChartPopup, setShotChartPopup] = useState(null);
+  const [viewingShotChart, setViewingShotChart] = useState(null);
+  const [shotChartSource, setShotChartSource] = useState('boxScore');
+  const [shotChartFilter, setShotChartFilter] = useState('all');
+  const [showQuality, setShowQuality] = useState(false);
+  const [isEndGameView, setIsEndGameView] = useState(false);
+  const [playerOrder, setPlayerOrder] = useState([]);
+  const [editingStatIndex, setEditingStatIndex] = useState(null);
+  const [insertStatMode, setInsertStatMode] = useState(null); // {index, position: 'above'|'below'}
+  const [focusedStatIndex, setFocusedStatIndex] = useState(null);
+  const [subModal, setSubModal] = useState(null);
+  const [onCourtSet, setOnCourtSet] = useState(new Set());
+  const [rotations, setRotations] = useState([]);
+  const rotationsRef = useRef([]);
+  const currentRotationKeyRef = useRef('');
+  const currentRotationHasStatRef = useRef(false);
+  const [showEndGameConfirm, setShowEndGameConfirm] = useState(false);
+  const [rotationsAutoDownload, setRotationsAutoDownload] = useState(false);
+  const [rotationsBackScreen, setRotationsBackScreen] = useState('game');
+
+  useEffect(() => {
+    const loadGames = async () => {
+      try {
+        const result = await storage.list('game:');
+        if (result && result.keys) {
+          const loadedGames = await Promise.all(
+            result.keys.map(async (key) => {
+              const data = await storage.get(key);
+              return data ? JSON.parse(data.value) : null;
+            })
+          );
+          setGames(loadedGames.filter(g => g !== null));
+        }
+      } catch (error) {
+        console.log('No previous games found');
+      }
+    };
+    loadGames();
+    const loadDarkMode = async () => {
+      try {
+        const result = await storage.get('darkMode');
+        if (result) setDarkMode(JSON.parse(result.value));
+      } catch (e) {}
+    };
+    loadDarkMode();
+  }, []);
+
+  const toggleDarkMode = async () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    try { await storage.set('darkMode', JSON.stringify(newMode)); } catch (e) {}
+  };
+
+  const saveGame = async (game) => {
+    await storage.set(`game:${game.id}`, JSON.stringify(game));
+  };
+
+  const deleteGame = async (gameId, gameIndex) => {
+    await storage.delete(`game:${gameId}`);
+    // Remove only the specific instance by index (handles duplicates)
+    if (gameIndex !== undefined) {
+      setGames(games.filter((_, idx) => idx !== gameIndex));
+    } else {
+      setGames(games.filter(g => g.id !== gameId));
+    }
+  };
+
+  const calculateTeamScore = (game) => {
+    if (!game || !game.players) return 0;
+    return game.players.reduce((total, player) => {
+      const stats = player.stats || {};
+      return total + (stats['2ptMade'] || 0) * 2 + (stats['3ptMade'] || 0) * 3 + (stats['FTMade'] || 0);
+    }, 0);
+  };
+
+  const calculateOpponentScore = (game) => {
+    if (!game || !game.opponent) return 0;
+    const stats = game.opponent.stats || {};
+    return (stats['2ptMade'] || 0) * 2 + (stats['3ptMade'] || 0) * 3 + (stats['FTMade'] || 0);
+  };
+
+  const calculatePlayerPoints = (player) => {
+    const stats = player.stats || {};
+    return (stats['2ptMade'] || 0) * 2 + (stats['3ptMade'] || 0) * 3 + (stats['FTMade'] || 0);
+  };
+
+  const getPlayerRebounds = (player) => {
+    const stats = player.stats || {};
+    return (stats['OffReb'] || 0) + (stats['DefReb'] || 0);
+  };
+
+  const movePlayerToTop = (playerIdx) => {
+    const newOrder = [...playerOrder];
+    const currentPos = newOrder.indexOf(playerIdx);
+    if (currentPos > 0) {
+      newOrder.splice(currentPos, 1);
+      newOrder.unshift(playerIdx);
+      setPlayerOrder(newOrder);
+    }
+  };
+
+  const movePlayerUp = (playerIdx) => {
+    const newOrder = [...playerOrder];
+    const currentPos = newOrder.indexOf(playerIdx);
+    if (currentPos > 0) {
+      [newOrder[currentPos - 1], newOrder[currentPos]] = [newOrder[currentPos], newOrder[currentPos - 1]];
+      setPlayerOrder(newOrder);
+    }
+  };
+
+  const movePlayerDown = (playerIdx) => {
+    const newOrder = [...playerOrder];
+    const currentPos = newOrder.indexOf(playerIdx);
+    if (currentPos < newOrder.length - 1) {
+      [newOrder[currentPos], newOrder[currentPos + 1]] = [newOrder[currentPos + 1], newOrder[currentPos]];
+      setPlayerOrder(newOrder);
+    }
+  };
+
+  const openSubModal = (playerIdx) => {
+    const othersInOrder = playerOrder.filter(idx => idx !== playerIdx);
+    const top4Others = othersInOrder.slice(0, 4);
+    const selections = {};
+    currentGame.players.forEach((_, idx) => {
+      selections[idx] = idx !== playerIdx && top4Others.includes(idx);
+    });
+    setSubModal({ triggerPlayerIdx: playerIdx, selections, error: '' });
+  };
+
+  const toggleSubSelection = (idx) => {
+    setSubModal(prev => ({
+      ...prev,
+      selections: { ...prev.selections, [idx]: !prev.selections[idx] },
+      error: ''
+    }));
+  };
+
+  const confirmSub = () => {
+    const onPlayers = Object.keys(subModal.selections).map(Number).filter(idx => subModal.selections[idx]);
+    if (onPlayers.length !== 5) {
+      setSubModal(prev => ({ ...prev, error: 'Must have 5 players selected' }));
+      return;
+    }
+    const offPlayers = Object.keys(subModal.selections).map(Number).filter(idx => !subModal.selections[idx]);
+    const sortedOnPlayers = [...onPlayers].sort((a, b) => {
+      const aScore = calculatePlayerPoints(currentGame.players[a]) + getPlayerRebounds(currentGame.players[a]);
+      const bScore = calculatePlayerPoints(currentGame.players[b]) + getPlayerRebounds(currentGame.players[b]);
+      return bScore - aScore;
+    });
+    setPlayerOrder([...sortedOnPlayers, ...offPlayers]);
+    setOnCourtSet(new Set(onPlayers));
+    currentRotationKeyRef.current = [...onPlayers].sort((a, b) => a - b).join(',');
+    currentRotationHasStatRef.current = false;
+    setSubModal(null);
+  };
+
+  const startNewGame = (gameInfo) => {
+    const newGame = {
+      id: Date.now(),
+      teamName: gameInfo.teamName,
+      opponentName: gameInfo.opponent,
+      date: gameInfo.date,
+      location: gameInfo.location,
+      enableShotChart: gameInfo.enableShotChart,
+      players: gameInfo.players.map(p => ({
+        ...p,
+        stats: { '2ptMade': 0, '2ptMiss': 0, '3ptMade': 0, '3ptMiss': 0, 'FTMade': 0, 'FTMiss': 0, 'OffReb': 0, 'DefReb': 0, 'Ast': 0, 'Stl': 0, 'Blk': 0, 'LiveTO': 0, 'DeadTO': 0, 'Foul': 0, 'ForceJB': 0, 'ConcedeJB': 0, 'plusMinus': 0 },
+        periodStats: {},
+        shotChart: []
+      })),
+      opponent: {
+        stats: { '2ptMade': 0, '2ptMiss': 0, '3ptMade': 0, '3ptMiss': 0, 'FTMade': 0, 'FTMiss': 0, 'OffReb': 0, 'DefReb': 0, 'Ast': 0, 'Stl': 0, 'Blk': 0, 'LiveTO': 0, 'DeadTO': 0, 'Foul': 0, 'ForceJB': 0, 'ConcedeJB': 0 },
+        periodStats: {}
+      },
+      maxPeriod: 1
+    };
+    setCurrentGame(newGame);
+    setCurrentPeriod(1);
+    setGameLog([]);
+    setLastStat(null);
+    setIsEndGameView(false);
+    setPlayerOrder(gameInfo.players.map((_, idx) => idx));
+    const initialOnCourt = new Set(gameInfo.players.slice(0, Math.min(5, gameInfo.players.length)).map((_, idx) => idx));
+    setOnCourtSet(initialOnCourt);
+    rotationsRef.current = [];
+    setRotations([]);
+    currentRotationKeyRef.current = [...initialOnCourt].sort((a, b) => a - b).join(',');
+    currentRotationHasStatRef.current = false;
+    setScreen('game');
+  };
+
+  const handleFieldGoalClick = (playerIndex, statType) => {
+    if (playerIndex === 'opponent' || !currentGame.enableShotChart) {
+      recordStat(playerIndex, statType);
+      return;
+    }
+    setShotChartPopup({ playerIndex, statType, step: 'location', x: null, y: null });
+  };
+
+  const handleCourtClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setShotChartPopup(prev => ({ ...prev, x, y, step: 'quality' }));
+  };
+
+  const handleCourtRelocation = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setShotChartPopup(prev => ({ ...prev, x, y }));
+  };
+
+  const handleQualitySelect = (quality) => {
+    const { playerIndex, statType, x, y } = shotChartPopup;
+    const isMade = statType.includes('Made');
+    const updatedGame = { ...currentGame };
+    const player = updatedGame.players[playerIndex];
+    player.shotChart = player.shotChart || [];
+    player.shotChart.push({ x, y, made: isMade, is3pt: statType.includes('3pt'), quality, period: currentPeriod, time: Date.now() });
+    setCurrentGame(updatedGame);
+    setShotChartPopup(null);
+    recordStat(playerIndex, statType, updatedGame);
+  };
+
+  const recordStat = (playerIndex, statType, gameOverride = null) => {
+    let updatedGame = gameOverride ? { ...gameOverride } : { ...currentGame };
+    const isOpponent = playerIndex === 'opponent';
+    const player = isOpponent ? updatedGame.opponent : updatedGame.players[playerIndex];
+
+    // Auto offensive rebound: if same TEAM had a FG miss immediately before this FG attempt
+    let autoOffReb = false;
+    if (statType === '2ptMade' || statType === '2ptMiss' || statType === '3ptMade' || statType === '3ptMiss') {
+      if (gameLog.length > 0) {
+        const lastEntry = gameLog[0];
+        const lastWasTeamMiss = isOpponent
+          ? (lastEntry.playerIndex === 'opponent' && (lastEntry.statType === '2ptMiss' || lastEntry.statType === '3ptMiss'))
+          : (lastEntry.playerIndex !== 'opponent' && (lastEntry.statType === '2ptMiss' || lastEntry.statType === '3ptMiss'));
+
+        if (lastWasTeamMiss) {
+          autoOffReb = true;
+          player.stats['OffReb'] = (player.stats['OffReb'] || 0) + 1;
+          if (!player.periodStats[currentPeriod]) player.periodStats[currentPeriod] = {};
+          player.periodStats[currentPeriod]['OffReb'] = (player.periodStats[currentPeriod]['OffReb'] || 0) + 1;
+        }
+      }
+    }
+
+    player.stats[statType] = (player.stats[statType] || 0) + 1;
+    if (!player.periodStats[currentPeriod]) player.periodStats[currentPeriod] = {};
+    player.periodStats[currentPeriod][statType] = (player.periodStats[currentPeriod][statType] || 0) + 1;
+    if (currentPeriod > updatedGame.maxPeriod) updatedGame.maxPeriod = currentPeriod;
+
+    const statLabel = { '2ptMade': '2PT Made', '2ptMiss': '2PT Miss', '3ptMade': '3PT Made', '3ptMiss': '3PT Miss', 'FTMade': 'FT Made', 'FTMiss': 'FT Miss', 'OffReb': 'Off Reb', 'DefReb': 'Def Reb', 'Ast': 'Assist', 'Stl': 'Steal', 'Blk': 'Block', 'LiveTO': 'Live TO', 'DeadTO': 'Dead TO', 'Foul': 'Foul', 'ForceJB': 'Force JB', 'ConcedeJB': 'Concede JB' };
+    const playerName = isOpponent ? 'Opponent' : `#${player.number} ${player.name}`;
+
+    let displayText = '';
+    if (statType === '2ptMade' || statType === '3ptMade' || statType === 'FTMade') {
+      displayText = `${playerName} - ${statLabel[statType]} (${calculatePlayerPoints(player)} pts)`;
+    } else if (statType === '2ptMiss' || statType === '3ptMiss') {
+      const fgMade = (player.stats['2ptMade'] || 0) + (player.stats['3ptMade'] || 0);
+      const fgMiss = (player.stats['2ptMiss'] || 0) + (player.stats['3ptMiss'] || 0);
+      const fgPct = fgMade + fgMiss > 0 ? Math.round((fgMade / (fgMade + fgMiss)) * 100) : 0;
+      displayText = `${playerName} - ${statLabel[statType]} (${fgMade}/${fgMade + fgMiss}, ${fgPct}%)`;
+    } else if (statType === 'FTMiss') {
+      const ftMade = player.stats['FTMade'] || 0;
+      const ftMiss = player.stats['FTMiss'] || 0;
+      const ftPct = ftMade + ftMiss > 0 ? Math.round((ftMade / (ftMade + ftMiss)) * 100) : 0;
+      displayText = `${playerName} - ${statLabel[statType]} (${ftMade}/${ftMade + ftMiss}, ${ftPct}%)`;
+    } else {
+      displayText = `${playerName} - ${statLabel[statType]} (${player.stats[statType]})`;
+    }
+
+    // +/- tracking: update all on-court players for scoring plays
+    let pmDelta = 0;
+    if (statType === '2ptMade') pmDelta = isOpponent ? -2 : 2;
+    else if (statType === '3ptMade') pmDelta = isOpponent ? -3 : 3;
+    else if (statType === 'FTMade') pmDelta = isOpponent ? -1 : 1;
+    const pmPlayers = pmDelta !== 0 ? [...onCourtSet] : [];
+    if (pmDelta !== 0) {
+      pmPlayers.forEach(idx => {
+        updatedGame.players[idx].stats['plusMinus'] = (updatedGame.players[idx].stats['plusMinus'] || 0) + pmDelta;
+      });
+    }
+
+    let newLog = [...gameLog];
+    if (autoOffReb) {
+      const orebText = `${playerName} - Off Reb (${player.stats['OffReb']}) [auto]`;
+      newLog = [{ time: Date.now() - 1, period: currentPeriod, playerIndex, statType: 'OffReb', text: orebText, auto: true }, ...newLog];
+    }
+    // Rotation tracking
+    const rotKey = currentRotationKeyRef.current;
+    let rotDeltas = null;
+    let rotTriggeredCount = false;
+    if (rotKey) {
+      let rPm = pmDelta;
+      let rReb = 0, rTo = 0, rTFGM = 0, rTFGA = 0, rOFGM = 0, rOFGA = 0;
+      if (!isOpponent) {
+        if (statType === '2ptMade' || statType === '3ptMade') { rTFGM = 1; rTFGA = 1; }
+        else if (statType === '2ptMiss' || statType === '3ptMiss') { rTFGA = 1; }
+        else if (statType === 'OffReb' || statType === 'DefReb') { rReb = 1; }
+        else if (statType === 'LiveTO' || statType === 'DeadTO') { rTo = -1; }
+      } else {
+        if (statType === '2ptMade' || statType === '3ptMade') { rOFGM = 1; rOFGA = 1; }
+        else if (statType === '2ptMiss' || statType === '3ptMiss') { rOFGA = 1; }
+        else if (statType === 'OffReb' || statType === 'DefReb') { rReb = -1; }
+        else if (statType === 'LiveTO' || statType === 'DeadTO') { rTo = 1; }
+      }
+      const hasAnyDelta = rPm !== 0 || rReb !== 0 || rTo !== 0 || rTFGM !== 0 || rTFGA !== 0 || rOFGM !== 0 || rOFGA !== 0;
+      if (hasAnyDelta) {
+        const updRots = [...rotationsRef.current];
+        let ri = updRots.findIndex(r => r.key === rotKey);
+        if (ri === -1) {
+          updRots.push({ key: rotKey, players: rotKey.split(',').map(Number), count: 0, plusMinus: 0, rebDiff: 0, toDiff: 0, teamFGMade: 0, teamFGAtt: 0, oppFGMade: 0, oppFGAtt: 0 });
+          ri = updRots.length - 1;
+        }
+        if (!currentRotationHasStatRef.current) {
+          updRots[ri] = { ...updRots[ri], count: updRots[ri].count + 1 };
+          currentRotationHasStatRef.current = true;
+          rotTriggeredCount = true;
+        }
+        updRots[ri] = { ...updRots[ri], plusMinus: updRots[ri].plusMinus + rPm, rebDiff: updRots[ri].rebDiff + rReb, toDiff: updRots[ri].toDiff + rTo, teamFGMade: updRots[ri].teamFGMade + rTFGM, teamFGAtt: updRots[ri].teamFGAtt + rTFGA, oppFGMade: updRots[ri].oppFGMade + rOFGM, oppFGAtt: updRots[ri].oppFGAtt + rOFGA };
+        rotationsRef.current = updRots;
+        setRotations(updRots);
+        rotDeltas = { rPm, rReb, rTo, rTFGM, rTFGA, rOFGM, rOFGA };
+      }
+    }
+
+    const mainEntry = { time: Date.now(), period: currentPeriod, playerIndex, statType, text: displayText };
+    if (pmDelta !== 0) { mainEntry.pmDelta = pmDelta; mainEntry.pmPlayers = pmPlayers; }
+    if (rotDeltas) { mainEntry.rotKey = rotKey; mainEntry.rotDeltas = rotDeltas; if (rotTriggeredCount) mainEntry.rotTriggeredCount = true; }
+    newLog = [mainEntry, ...newLog];
+
+    setGameLog(newLog);
+    setLastStat({ text: displayText });
+
+    // Auto-reciprocal: our player Steal → opponent Live TO
+    if (!isOpponent && statType === 'Stl') {
+      updatedGame.opponent.stats['LiveTO'] = (updatedGame.opponent.stats['LiveTO'] || 0) + 1;
+      if (!updatedGame.opponent.periodStats[currentPeriod]) updatedGame.opponent.periodStats[currentPeriod] = {};
+      updatedGame.opponent.periodStats[currentPeriod]['LiveTO'] = (updatedGame.opponent.periodStats[currentPeriod]['LiveTO'] || 0) + 1;
+    }
+    // Auto-reciprocal: our player Live TO → opponent Steal
+    if (!isOpponent && statType === 'LiveTO') {
+      updatedGame.opponent.stats['Stl'] = (updatedGame.opponent.stats['Stl'] || 0) + 1;
+      if (!updatedGame.opponent.periodStats[currentPeriod]) updatedGame.opponent.periodStats[currentPeriod] = {};
+      updatedGame.opponent.periodStats[currentPeriod]['Stl'] = (updatedGame.opponent.periodStats[currentPeriod]['Stl'] || 0) + 1;
+    }
+
+    setCurrentGame(updatedGame);
+  };
+
+  const undoLastStat = () => {
+    if (gameLog.length === 0) return;
+    const lastEntry = gameLog[0];
+
+    if (lastEntry.statType === 'endPeriod') {
+      const newLog = gameLog.slice(1);
+      setGameLog(newLog);
+      setCurrentPeriod(lastEntry.period);
+      setLastStat(newLog.length > 0 ? { text: newLog[0].text } : null);
+      return;
+    }
+
+    const updatedGame = { ...currentGame };
+    const isOpponent = lastEntry.playerIndex === 'opponent';
+    const player = isOpponent ? updatedGame.opponent : updatedGame.players[lastEntry.playerIndex];
+    if (player.stats[lastEntry.statType] > 0) player.stats[lastEntry.statType]--;
+    const logPeriod = lastEntry.period;
+    if (player.periodStats[logPeriod] && player.periodStats[logPeriod][lastEntry.statType] > 0) {
+      player.periodStats[logPeriod][lastEntry.statType]--;
+    }
+    if (lastEntry.pmDelta && lastEntry.pmPlayers) {
+      lastEntry.pmPlayers.forEach(idx => {
+        if (updatedGame.players[idx]) {
+          updatedGame.players[idx].stats['plusMinus'] = (updatedGame.players[idx].stats['plusMinus'] || 0) - lastEntry.pmDelta;
+        }
+      });
+    }
+    if (lastEntry.rotKey && lastEntry.rotDeltas) {
+      const updRots = [...rotationsRef.current];
+      const ri = updRots.findIndex(r => r.key === lastEntry.rotKey);
+      if (ri !== -1) {
+        const d = lastEntry.rotDeltas;
+        const rot = { ...updRots[ri], plusMinus: updRots[ri].plusMinus - d.rPm, rebDiff: updRots[ri].rebDiff - d.rReb, toDiff: updRots[ri].toDiff - d.rTo, teamFGMade: updRots[ri].teamFGMade - d.rTFGM, teamFGAtt: updRots[ri].teamFGAtt - d.rTFGA, oppFGMade: updRots[ri].oppFGMade - d.rOFGM, oppFGAtt: updRots[ri].oppFGAtt - d.rOFGA };
+        if (lastEntry.rotTriggeredCount) { rot.count = Math.max(0, rot.count - 1); currentRotationHasStatRef.current = false; }
+        updRots[ri] = rot;
+        rotationsRef.current = updRots;
+        setRotations(updRots);
+      }
+    }
+    if (!isOpponent && (lastEntry.statType.includes('2pt') || lastEntry.statType.includes('3pt'))) {
+      if (player.shotChart && player.shotChart.length > 0) player.shotChart.pop();
+    }
+    if (!isOpponent && lastEntry.statType === 'Stl' && updatedGame.opponent.stats['LiveTO'] > 0) {
+      updatedGame.opponent.stats['LiveTO']--;
+      if (updatedGame.opponent.periodStats[logPeriod]) updatedGame.opponent.periodStats[logPeriod]['LiveTO'] = Math.max(0, (updatedGame.opponent.periodStats[logPeriod]['LiveTO'] || 0) - 1);
+    }
+    if (!isOpponent && lastEntry.statType === 'LiveTO' && updatedGame.opponent.stats['Stl'] > 0) {
+      updatedGame.opponent.stats['Stl']--;
+      if (updatedGame.opponent.periodStats[logPeriod]) updatedGame.opponent.periodStats[logPeriod]['Stl'] = Math.max(0, (updatedGame.opponent.periodStats[logPeriod]['Stl'] || 0) - 1);
+    }
+
+    let newLog = gameLog.slice(1);
+    // Also undo auto offensive rebound if present
+    if (newLog.length > 0 && newLog[0].auto && newLog[0].statType === 'OffReb') {
+      const autoEntry = newLog[0];
+      const autoPlayer = autoEntry.playerIndex === 'opponent' ? updatedGame.opponent : updatedGame.players[autoEntry.playerIndex];
+      if (autoPlayer.stats['OffReb'] > 0) autoPlayer.stats['OffReb']--;
+      if (autoPlayer.periodStats[autoEntry.period] && autoPlayer.periodStats[autoEntry.period]['OffReb'] > 0) {
+        autoPlayer.periodStats[autoEntry.period]['OffReb']--;
+      }
+      newLog = newLog.slice(1);
+    }
+
+    setGameLog(newLog);
+    setCurrentGame(updatedGame);
+    setLastStat(newLog.length > 0 ? { text: newLog[0].text } : null);
+  };
+
+  const deleteStatAtIndex = (index) => {
+    if (index < 0 || index >= gameLog.length) return;
+    const entry = gameLog[index];
+
+    if (entry.statType === 'endPeriod') {
+      const newLog = [...gameLog];
+      newLog.splice(index, 1);
+      setGameLog(newLog);
+      return;
+    }
+
+    const updatedGame = { ...currentGame };
+    const isOpponent = entry.playerIndex === 'opponent';
+    const player = isOpponent ? updatedGame.opponent : updatedGame.players[entry.playerIndex];
+
+    if (player && player.stats[entry.statType] > 0) player.stats[entry.statType]--;
+    const logPeriod = entry.period;
+    if (player && player.periodStats[logPeriod] && player.periodStats[logPeriod][entry.statType] > 0) {
+      player.periodStats[logPeriod][entry.statType]--;
+    }
+    if (entry.pmDelta && entry.pmPlayers) {
+      entry.pmPlayers.forEach(idx => {
+        if (updatedGame.players[idx]) {
+          updatedGame.players[idx].stats['plusMinus'] = (updatedGame.players[idx].stats['plusMinus'] || 0) - entry.pmDelta;
+        }
+      });
+    }
+    if (entry.rotKey && entry.rotDeltas) {
+      const updRots = [...rotationsRef.current];
+      const ri = updRots.findIndex(r => r.key === entry.rotKey);
+      if (ri !== -1) {
+        const d = entry.rotDeltas;
+        updRots[ri] = { ...updRots[ri], plusMinus: updRots[ri].plusMinus - d.rPm, rebDiff: updRots[ri].rebDiff - d.rReb, toDiff: updRots[ri].toDiff - d.rTo, teamFGMade: updRots[ri].teamFGMade - d.rTFGM, teamFGAtt: updRots[ri].teamFGAtt - d.rTFGA, oppFGMade: updRots[ri].oppFGMade - d.rOFGM, oppFGAtt: updRots[ri].oppFGAtt - d.rOFGA };
+        rotationsRef.current = updRots;
+        setRotations(updRots);
+      }
+    }
+
+    // Handle related stats
+    if (!isOpponent && entry.statType === 'Stl' && updatedGame.opponent.stats['LiveTO'] > 0) {
+      updatedGame.opponent.stats['LiveTO']--;
+      if (updatedGame.opponent.periodStats[logPeriod]) {
+        updatedGame.opponent.periodStats[logPeriod]['LiveTO'] = Math.max(0, (updatedGame.opponent.periodStats[logPeriod]['LiveTO'] || 0) - 1);
+      }
+    }
+    if (!isOpponent && entry.statType === 'LiveTO' && updatedGame.opponent.stats['Stl'] > 0) {
+      updatedGame.opponent.stats['Stl']--;
+      if (updatedGame.opponent.periodStats[logPeriod]) {
+        updatedGame.opponent.periodStats[logPeriod]['Stl'] = Math.max(0, (updatedGame.opponent.periodStats[logPeriod]['Stl'] || 0) - 1);
+      }
+    }
+
+    const newLog = [...gameLog];
+    newLog.splice(index, 1);
+    setGameLog(newLog);
+    setCurrentGame(updatedGame);
+  };
+
+  const insertStatAtIndex = (index, position, playerIndex, statType, period) => {
+    const updatedGame = { ...currentGame };
+    const isOpponent = playerIndex === 'opponent';
+    const player = isOpponent ? updatedGame.opponent : updatedGame.players[playerIndex];
+
+    player.stats[statType] = (player.stats[statType] || 0) + 1;
+    if (!player.periodStats[period]) player.periodStats[period] = {};
+    player.periodStats[period][statType] = (player.periodStats[period][statType] || 0) + 1;
+    if (period > updatedGame.maxPeriod) updatedGame.maxPeriod = period;
+
+    const statLabel = { '2ptMade': '2PT Made', '2ptMiss': '2PT Miss', '3ptMade': '3PT Made', '3ptMiss': '3PT Miss', 'FTMade': 'FT Made', 'FTMiss': 'FT Miss', 'OffReb': 'Off Reb', 'DefReb': 'Def Reb', 'Ast': 'Assist', 'Stl': 'Steal', 'Blk': 'Block', 'LiveTO': 'Live TO', 'DeadTO': 'Dead TO', 'Foul': 'Foul', 'ForceJB': 'Force JB', 'ConcedeJB': 'Concede JB', 'endPeriod': 'End Period' };
+    const playerName = isOpponent ? 'Opponent' : `#${player.number} ${player.name}`;
+
+    let displayText = '';
+    if (statType === 'endPeriod') {
+      displayText = `End Period ${period}`;
+    } else {
+      displayText = `${playerName} - ${statLabel[statType]} (${player.stats[statType]})`;
+    }
+
+    const newEntry = { time: Date.now(), period, playerIndex, statType, text: displayText };
+    const newLog = [...gameLog];
+    const insertIdx = position === 'above' ? index : index + 1;
+    newLog.splice(insertIdx, 0, newEntry);
+
+    // Handle related stats
+    if (!isOpponent && statType === 'Stl') {
+      updatedGame.opponent.stats['LiveTO'] = (updatedGame.opponent.stats['LiveTO'] || 0) + 1;
+      if (!updatedGame.opponent.periodStats[period]) updatedGame.opponent.periodStats[period] = {};
+      updatedGame.opponent.periodStats[period]['LiveTO'] = (updatedGame.opponent.periodStats[period]['LiveTO'] || 0) + 1;
+    }
+    if (!isOpponent && statType === 'LiveTO') {
+      updatedGame.opponent.stats['Stl'] = (updatedGame.opponent.stats['Stl'] || 0) + 1;
+      if (!updatedGame.opponent.periodStats[period]) updatedGame.opponent.periodStats[period] = {};
+      updatedGame.opponent.periodStats[period]['Stl'] = (updatedGame.opponent.periodStats[period]['Stl'] || 0) + 1;
+    }
+
+    // Update rotation data for the current lineup
+    const rotKey = currentRotationKeyRef.current;
+    if (rotKey && statType !== 'endPeriod') {
+      let rPm = 0, rReb = 0, rTo = 0, rTFGM = 0, rTFGA = 0, rOFGM = 0, rOFGA = 0;
+      if (statType === '2ptMade') rPm = isOpponent ? -2 : 2;
+      else if (statType === '3ptMade') rPm = isOpponent ? -3 : 3;
+      else if (statType === 'FTMade') rPm = isOpponent ? -1 : 1;
+      if (!isOpponent) {
+        if (statType === '2ptMade' || statType === '3ptMade') { rTFGM = 1; rTFGA = 1; }
+        else if (statType === '2ptMiss' || statType === '3ptMiss') { rTFGA = 1; }
+        else if (statType === 'OffReb' || statType === 'DefReb') { rReb = 1; }
+        else if (statType === 'LiveTO' || statType === 'DeadTO') { rTo = -1; }
+      } else {
+        if (statType === '2ptMade' || statType === '3ptMade') { rOFGM = 1; rOFGA = 1; }
+        else if (statType === '2ptMiss' || statType === '3ptMiss') { rOFGA = 1; }
+        else if (statType === 'OffReb' || statType === 'DefReb') { rReb = -1; }
+        else if (statType === 'LiveTO' || statType === 'DeadTO') { rTo = 1; }
+      }
+      const hasAnyDelta = rPm !== 0 || rReb !== 0 || rTo !== 0 || rTFGM !== 0 || rTFGA !== 0 || rOFGM !== 0 || rOFGA !== 0;
+      if (hasAnyDelta) {
+        const updRots = [...rotationsRef.current];
+        let ri = updRots.findIndex(r => r.key === rotKey);
+        if (ri === -1) {
+          updRots.push({ key: rotKey, players: rotKey.split(',').map(Number), count: 0, plusMinus: 0, rebDiff: 0, toDiff: 0, teamFGMade: 0, teamFGAtt: 0, oppFGMade: 0, oppFGAtt: 0 });
+          ri = updRots.length - 1;
+        }
+        updRots[ri] = { ...updRots[ri], plusMinus: updRots[ri].plusMinus + rPm, rebDiff: updRots[ri].rebDiff + rReb, toDiff: updRots[ri].toDiff + rTo, teamFGMade: updRots[ri].teamFGMade + rTFGM, teamFGAtt: updRots[ri].teamFGAtt + rTFGA, oppFGMade: updRots[ri].oppFGMade + rOFGM, oppFGAtt: updRots[ri].oppFGAtt + rOFGA };
+        rotationsRef.current = updRots;
+        setRotations(updRots);
+      }
+    }
+
+    setGameLog(newLog);
+    setCurrentGame(updatedGame);
+    setFocusedStatIndex(insertIdx);
+    setInsertStatMode(null);
+  };
+
+  const insertEndPeriodAtIndex = (index, position, period) => {
+    const displayText = `End Period ${period}`;
+    const newEntry = { time: Date.now(), period, playerIndex: null, statType: 'endPeriod', text: displayText };
+    const newLog = [...gameLog];
+    const insertIdx = position === 'above' ? index : index + 1;
+    newLog.splice(insertIdx, 0, newEntry);
+
+    const updatedGame = { ...currentGame };
+    if (period > updatedGame.maxPeriod) updatedGame.maxPeriod = period;
+
+    setGameLog(newLog);
+    setCurrentGame(updatedGame);
+    setFocusedStatIndex(insertIdx);
+    setInsertStatMode(null);
+  };
+
+  const endPeriod = () => {
+    if (currentPeriod < 8) {
+      const endPeriodText = `End Period ${currentPeriod}`;
+      setGameLog([{ time: Date.now(), period: currentPeriod, playerIndex: null, statType: 'endPeriod', text: endPeriodText }, ...gameLog]);
+      setLastStat({ text: endPeriodText });
+      setCurrentPeriod(currentPeriod + 1);
+    }
+  };
+
+  const endGame = async () => {
+    const gameToSave = { ...currentGame, rotations: rotationsRef.current };
+    await saveGame(gameToSave);
+    setCurrentGame(gameToSave);
+    if (!games.some(g => g.id === gameToSave.id)) {
+      setGames([...games, gameToSave]);
+    } else {
+      setGames(games.map(g => g.id === gameToSave.id ? gameToSave : g));
+    }
+    setIsEndGameView(true);
+    setFilterPeriod('Total');
+    setScreen('boxScore');
+  };
+
+  const viewGame = (game) => {
+    setCurrentGame(game);
+    setFilterPeriod('Total');
+    setIsEndGameView(false);
+    setScreen('viewGame');
+  };
+
+  const resumeGame = (game) => {
+    setCurrentGame(game);
+    setCurrentPeriod(game.maxPeriod || 1);
+    setGameLog([]);
+    setLastStat(null);
+    setIsEndGameView(false);
+    setPlayerOrder(game.players.map((_, idx) => idx));
+    const initialOnCourt = new Set(game.players.slice(0, Math.min(5, game.players.length)).map((_, idx) => idx));
+    setOnCourtSet(initialOnCourt);
+    rotationsRef.current = game.rotations || [];
+    setRotations(game.rotations || []);
+    currentRotationKeyRef.current = [...initialOnCourt].sort((a, b) => a - b).join(',');
+    currentRotationHasStatRef.current = false;
+    setScreen('game');
+  };
+
+  const viewGameRotations = (game) => {
+    setCurrentGame(game);
+    setRotations(game.rotations || []);
+    setRotationsBackScreen('viewGame');
+    setScreen('rotations');
+  };
+
+  const theme = {
+    bg: darkMode ? 'bg-gray-900' : 'bg-gray-100',
+    card: darkMode ? 'bg-gray-800' : 'bg-white',
+    text: darkMode ? 'text-white' : 'text-gray-900',
+    textMuted: darkMode ? 'text-gray-400' : 'text-gray-600',
+    border: darkMode ? 'border-gray-700' : 'border-gray-200',
+    inputBg: darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900',
+  };
+
+  // Doubled width for accumulating stats (px-4 instead of px-2), shooting buttons use px-6 (30% wider)
+  const StatButton = ({ label, onClick, color = 'bg-blue-500', wide = false, shooting = false }) => (
+    <button onClick={onClick} className={`${color} hover:opacity-80 text-white text-xs ${shooting ? 'px-6' : wide ? 'px-4' : 'px-2'} py-1.5 rounded font-medium`}>{label}</button>
+  );
+
+  if (screen === 'home') return <HomeScreen onNewGame={() => setScreen('setup')} onViewGames={() => setScreen('viewGames')} darkMode={darkMode} toggleDarkMode={toggleDarkMode} theme={theme} />;
+  if (screen === 'setup') return <GameSetup onStart={startNewGame} onBack={() => setScreen('home')} games={games} darkMode={darkMode} theme={theme} />;
+
+  if (screen === 'game') {
+    const teamScore = calculateTeamScore(currentGame);
+    const opponentScore = calculateOpponentScore(currentGame);
+    const orderedPlayers = playerOrder.map(idx => ({ ...currentGame.players[idx], originalIndex: idx }));
+
+    return (
+      <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-6xl mx-auto`}>
+        <div className="flex justify-end mb-2">
+          <button onClick={toggleDarkMode} className={`p-2 rounded-full ${theme.card}`}>{darkMode ? <Sun size={20} /> : <Moon size={20} />}</button>
+        </div>
+        <div className="bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg shadow-lg p-4 mb-4 text-white">
+          <div className="flex justify-between items-center">
+            <div className="text-center flex-1"><div className="text-sm font-medium opacity-90">{currentGame.teamName}</div><div className="text-5xl font-bold">{teamScore}</div></div>
+            <div className="text-center px-4"><div className="text-lg font-semibold">vs</div><div className="text-sm opacity-75">Q{currentPeriod}</div></div>
+            <div className="text-center flex-1"><div className="text-sm font-medium opacity-90">{currentGame.opponentName}</div><div className="text-5xl font-bold">{opponentScore}</div></div>
+          </div>
+        </div>
+        <div className={`${theme.card} rounded-lg shadow-lg p-4 mb-4`}>
+          <p className={`text-sm ${theme.textMuted}`}>{currentGame.date} • {currentGame.location}</p>
+          {lastStat && <p className="text-sm text-blue-500 mt-1">Last: {lastStat.text}</p>}
+        </div>
+
+        <div className="flex gap-2 mb-4 flex-wrap items-center">
+          <button onClick={undoLastStat} disabled={gameLog.length === 0} className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-50 flex items-center gap-1"><Undo size={16} /> Undo</button>
+          <button onClick={endPeriod} disabled={currentPeriod >= 8} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 disabled:opacity-50">End Period</button>
+          <button onClick={() => { setRotations(rotationsRef.current); setRotationsBackScreen('game'); setScreen('rotations'); }} className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700">Rotations</button>
+          <div className="flex-1"></div>
+          <button onClick={() => setScreen('boxScore')} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Box Score</button>
+          {currentGame.enableShotChart && <button onClick={() => { setViewingShotChart({ type: 'team' }); setShotChartSource('boxScore'); setScreen('shotChart'); }} className="bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700">Team Shots</button>}
+          <button onClick={() => { setFocusedStatIndex(null); setScreen('gameLog'); }} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Game Log</button>
+          <div className="flex-1"></div>
+          {showEndGameConfirm ? (
+            <div className="flex gap-2 items-center">
+              <span className={`text-sm font-medium ${theme.text}`}>End game?</span>
+              <button onClick={() => { setShowEndGameConfirm(false); endGame(); }} className="bg-red-700 text-white px-3 py-2 rounded hover:bg-red-800 text-sm font-bold">Yes</button>
+              <button onClick={() => setShowEndGameConfirm(false)} className="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600 text-sm">Cancel</button>
+            </div>
+          ) : (
+            <button onClick={() => setShowEndGameConfirm(true)} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">End Game</button>
+          )}
+        </div>
+
+        {/* Opponent Box */}
+        <div className={`${darkMode ? 'bg-yellow-900/40' : 'bg-yellow-100'} border-4 border-yellow-600 rounded-lg p-3 mb-4 shadow-lg`}>
+          <div className="text-xl font-bold mb-3 text-center">{currentGame.opponentName || 'Opponent'}</div>
+          <div className="grid grid-cols-12 gap-1">
+            {/* Left: Shots */}
+            <div className="col-span-4 space-y-1">
+              <div className="flex gap-1">
+                <StatButton label="2PM" onClick={() => recordStat('opponent', '2ptMade')} color="bg-green-600" shooting />
+                <StatButton label="2PX" onClick={() => recordStat('opponent', '2ptMiss')} color="bg-red-600" shooting />
+                <StatButton label="FTM" onClick={() => recordStat('opponent', 'FTMade')} color="bg-green-500" shooting />
+              </div>
+              <div className="flex gap-1">
+                <StatButton label="3PM" onClick={() => recordStat('opponent', '3ptMade')} color="bg-green-700" shooting />
+                <StatButton label="3PX" onClick={() => recordStat('opponent', '3ptMiss')} color="bg-red-700" shooting />
+                <StatButton label="FTX" onClick={() => recordStat('opponent', 'FTMiss')} color="bg-red-500" shooting />
+              </div>
+            </div>
+            {/* Middle: Other stats */}
+            <div className="col-span-4 space-y-1">
+              <div className="flex gap-1 justify-center">
+                <StatButton label="AST" onClick={() => recordStat('opponent', 'Ast')} color="bg-blue-600" wide />
+                <StatButton label="STL" onClick={() => recordStat('opponent', 'Stl')} color="bg-indigo-600" wide />
+                <StatButton label="BLK" onClick={() => recordStat('opponent', 'Blk')} color="bg-purple-600" wide />
+              </div>
+              <div className="flex gap-1 justify-center">
+                <StatButton label="FJB" onClick={() => recordStat('opponent', 'ForceJB')} color="bg-teal-600" wide />
+                <StatButton label="CJB" onClick={() => recordStat('opponent', 'ConcedeJB')} color="bg-pink-600" wide />
+                <StatButton label="FOUL" onClick={() => recordStat('opponent', 'Foul')} color="bg-rose-600" wide />
+              </div>
+            </div>
+            {/* Right: TOs and Rebounds */}
+            <div className="col-span-4 space-y-1">
+              <div className="flex gap-1 justify-end">
+                <StatButton label="Live TO" onClick={() => recordStat('opponent', 'LiveTO')} color="bg-gray-600" shooting />
+                <StatButton label="OReb" onClick={() => recordStat('opponent', 'OffReb')} color="bg-yellow-600" shooting />
+              </div>
+              <div className="flex gap-1 justify-end">
+                <StatButton label="Dead TO" onClick={() => recordStat('opponent', 'DeadTO')} color="bg-gray-500" shooting />
+                <StatButton label="DReb" onClick={() => recordStat('opponent', 'DefReb')} color="bg-yellow-700" shooting />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Player Boxes */}
+        <div className="space-y-3">
+          {orderedPlayers.map((player, orderIdx) => {
+            const hasTracking = onCourtSet.size > 0;
+            const isOnCourt = !hasTracking || onCourtSet.has(player.originalIndex);
+            const cardBg = hasTracking
+              ? (isOnCourt ? (darkMode ? 'bg-blue-950' : 'bg-blue-50') : (darkMode ? 'bg-blue-900' : 'bg-blue-700'))
+              : theme.card;
+            const cardBorder = hasTracking
+              ? (isOnCourt ? 'border-blue-400' : 'border-blue-900')
+              : (darkMode ? 'border-blue-500' : 'border-blue-600');
+            const cardTextColor = hasTracking && !isOnCourt ? 'text-white' : theme.text;
+            return (
+            <div key={player.originalIndex} className={`${cardBg} ${cardTextColor} rounded-lg shadow-lg p-3 border-4 ${cardBorder}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1"></div>
+                <div className="text-xl font-bold text-center">#{player.number} {player.name}</div>
+                <div className="flex-1 flex justify-end gap-1">
+                  <button onClick={() => openSubModal(player.originalIndex)} className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-2 py-1 rounded font-bold" title="Substitution">SUB</button>
+                  <button onClick={() => movePlayerUp(player.originalIndex)} className={`p-1 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`} title="Move up one">
+                    <ChevronUp size={16} />
+                  </button>
+                  <button onClick={() => movePlayerDown(player.originalIndex)} className={`p-1 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`} title="Move down one">
+                    <ChevronDown size={16} />
+                  </button>
+                  <button onClick={() => movePlayerToTop(player.originalIndex)} className={`p-1.5 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`} title="Move to top">
+                    <ChevronsUp size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-12 gap-1">
+                {/* Left: Shots */}
+                <div className="col-span-4 space-y-1">
+                  <div className="flex gap-1">
+                    <StatButton label="2PM" onClick={() => handleFieldGoalClick(player.originalIndex, '2ptMade')} color="bg-green-600" shooting />
+                    <StatButton label="2PX" onClick={() => handleFieldGoalClick(player.originalIndex, '2ptMiss')} color="bg-red-600" shooting />
+                    <StatButton label="FTM" onClick={() => recordStat(player.originalIndex, 'FTMade')} color="bg-green-500" shooting />
+                  </div>
+                  <div className="flex gap-1">
+                    <StatButton label="3PM" onClick={() => handleFieldGoalClick(player.originalIndex, '3ptMade')} color="bg-green-700" shooting />
+                    <StatButton label="3PX" onClick={() => handleFieldGoalClick(player.originalIndex, '3ptMiss')} color="bg-red-700" shooting />
+                    <StatButton label="FTX" onClick={() => recordStat(player.originalIndex, 'FTMiss')} color="bg-red-500" shooting />
+                  </div>
+                </div>
+                {/* Middle: Other stats */}
+                <div className="col-span-4 space-y-1">
+                  <div className="flex gap-1 justify-center">
+                    <StatButton label="AST" onClick={() => recordStat(player.originalIndex, 'Ast')} color="bg-blue-600" wide />
+                    <StatButton label="STL" onClick={() => recordStat(player.originalIndex, 'Stl')} color="bg-indigo-600" wide />
+                    <StatButton label="BLK" onClick={() => recordStat(player.originalIndex, 'Blk')} color="bg-purple-600" wide />
+                  </div>
+                  <div className="flex gap-1 justify-center">
+                    <StatButton label="FJB" onClick={() => recordStat(player.originalIndex, 'ForceJB')} color="bg-teal-600" wide />
+                    <StatButton label="CJB" onClick={() => recordStat(player.originalIndex, 'ConcedeJB')} color="bg-pink-600" wide />
+                    <StatButton label="FOUL" onClick={() => recordStat(player.originalIndex, 'Foul')} color="bg-rose-600" wide />
+                  </div>
+                </div>
+                {/* Right: TOs and Rebounds */}
+                <div className="col-span-4 space-y-1">
+                  <div className="flex gap-1 justify-end">
+                    <StatButton label="Live TO" onClick={() => recordStat(player.originalIndex, 'LiveTO')} color="bg-gray-600" shooting />
+                    <StatButton label="OReb" onClick={() => recordStat(player.originalIndex, 'OffReb')} color="bg-yellow-600" shooting />
+                  </div>
+                  <div className="flex gap-1 justify-end">
+                    <StatButton label="Dead TO" onClick={() => recordStat(player.originalIndex, 'DeadTO')} color="bg-gray-500" shooting />
+                    <StatButton label="DReb" onClick={() => recordStat(player.originalIndex, 'DefReb')} color="bg-yellow-700" shooting />
+                  </div>
+                </div>
+              </div>
+            </div>
+            );
+          })}
+        </div>
+        {shotChartPopup && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className={`${theme.card} ${theme.text} rounded-lg p-4 max-w-md w-full`}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">{shotChartPopup.step === 'location' ? 'Tap shot location' : 'Shot Quality (A-C)'}</h3>
+                <button onClick={() => setShotChartPopup(null)} className="p-1"><X size={24} /></button>
+              </div>
+              {shotChartPopup.step === 'location' ? (
+                <div className="relative bg-orange-200 rounded-lg" style={{ aspectRatio: '1/1' }}>
+                  <svg viewBox="0 0 50 50" className="w-full h-full cursor-crosshair" onClick={handleCourtClick}>
+                    <rect x="0" y="0" width="50" height="50" fill="#CD853F" stroke="#fff" strokeWidth="0.5"/>
+                    <rect x="0" y="17" width="19" height="16" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                    <circle cx="19" cy="25" r="6" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                    <path d="M 0 3 L 14 3 A 23.75 23.75 0 0 1 14 47 L 0 47" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                    <path d="M 4 21 A 4 4 0 0 1 4 29" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                    <circle cx="5.25" cy="25" r="0.75" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                    <line x1="4" y1="22" x2="4" y2="28" stroke="#fff" strokeWidth="0.5"/>
+                    <line x1="0" y1="19" x2="19" y2="19" stroke="#fff" strokeWidth="0.2"/>
+                    <line x1="0" y1="31" x2="19" y2="31" stroke="#fff" strokeWidth="0.2"/>
+                  </svg>
+                  <div className="absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-1 rounded">Tap where shot was taken</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="relative bg-orange-200 rounded-lg" style={{ aspectRatio: '1/1' }}>
+                    <svg viewBox="0 0 50 50" className="w-full h-full cursor-crosshair" onClick={handleCourtRelocation}>
+                      <rect x="0" y="0" width="50" height="50" fill="#CD853F" stroke="#fff" strokeWidth="0.5"/>
+                      <rect x="0" y="17" width="19" height="16" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                      <circle cx="19" cy="25" r="6" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                      <path d="M 0 3 L 14 3 A 23.75 23.75 0 0 1 14 47 L 0 47" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                      <path d="M 4 21 A 4 4 0 0 1 4 29" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                      <circle cx="5.25" cy="25" r="0.75" fill="none" stroke="#fff" strokeWidth="0.3"/>
+                      <line x1="4" y1="22" x2="4" y2="28" stroke="#fff" strokeWidth="0.5"/>
+                      {shotChartPopup.statType.includes('Made') ? (
+                        <circle cx={shotChartPopup.x * 0.5} cy={shotChartPopup.y * 0.5} r="1" fill="#22c55e" stroke="#fff" strokeWidth="0.15"/>
+                      ) : (
+                        <text x={shotChartPopup.x * 0.5} y={shotChartPopup.y * 0.5} textAnchor="middle" dominantBaseline="middle" fill="#ef4444" fontSize="2.5" fontWeight="bold" stroke="#fff" strokeWidth="0.1">✕</text>
+                      )}
+                    </svg>
+                  </div>
+                  <p className={`text-center text-xs ${theme.textMuted} -mt-1`}>Tap court to reposition</p>
+                  <div className="flex gap-2 justify-center">
+                    {['A', 'B', 'C'].map((q, idx) => (
+                      <button key={q} onClick={() => handleQualitySelect(q)} className={`px-8 py-4 rounded-lg text-xl font-bold ${q === 'A' ? 'bg-green-500' : q === 'B' ? 'bg-yellow-500' : 'bg-red-500'} text-white hover:opacity-90`}>{q}</button>
+                    ))}
+                  </div>
+                  <p className={`text-center text-sm ${theme.textMuted}`}>A = Wide Open • B = Average • C = Contested</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {subModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className={`${theme.card} ${theme.text} rounded-lg p-5 max-w-md w-full max-h-[80vh] overflow-y-auto`}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Substitution</h3>
+                <button onClick={() => setSubModal(null)} className="p-1"><X size={24} /></button>
+              </div>
+              <div className="space-y-3 mb-4">
+                {currentGame.players.map((player, idx) => {
+                  const isOn = subModal.selections[idx];
+                  return (
+                    <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border}`}>
+                      <span className="font-medium">#{player.number} {player.name}</span>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`relative w-12 h-6 rounded-full cursor-pointer transition-colors ${isOn ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          onClick={() => toggleSubSelection(idx)}
+                        >
+                          <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isOn ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                        </div>
+                        <span className={`text-sm font-semibold w-8 ${isOn ? 'text-blue-500' : theme.textMuted}`}>{isOn ? 'ON' : 'OFF'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {subModal.error && <p className="text-red-500 text-sm mb-3 font-medium">{subModal.error}</p>}
+              <button onClick={confirmSub} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">OK</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (screen === 'rotations') return <RotationsScreen game={currentGame} rotations={rotations} onBack={() => setScreen(rotationsBackScreen)} darkMode={darkMode} theme={theme} autoDownload={rotationsAutoDownload} onAutoDownloadDone={() => setRotationsAutoDownload(false)} />;
+  if (screen === 'boxScore') return <BoxScore game={currentGame} onBack={() => { if (isEndGameView) { setScreen('home'); setIsEndGameView(false); } else { setScreen('game'); }}} onMainMenu={() => { setScreen('home'); setIsEndGameView(false); }} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} darkMode={darkMode} theme={theme} onViewShotChart={(idx) => { setViewingShotChart({ type: idx === 'team' ? 'team' : 'player', playerIndex: idx }); setShotChartSource('boxScore'); setScreen('shotChart'); }} toggleDarkMode={toggleDarkMode} isEndGameView={isEndGameView} calculatePlayerPoints={calculatePlayerPoints} getPlayerRebounds={getPlayerRebounds} gameLog={gameLog} rotations={rotations} onViewRotations={() => { setRotationsBackScreen('boxScore'); setScreen('rotations'); }} onDownloadRotationsJPG={() => { setRotationsAutoDownload(true); setRotationsBackScreen('boxScore'); setScreen('rotations'); }} />;
+  if (screen === 'shotChart') return <ShotChartView game={currentGame} viewingShotChart={viewingShotChart} onBack={() => setScreen(shotChartSource)} onBoxScore={() => setScreen('boxScore')} onStatAccumulation={() => setScreen('game')} darkMode={darkMode} theme={theme} shotChartFilter={shotChartFilter} setShotChartFilter={setShotChartFilter} showQuality={showQuality} setShowQuality={setShowQuality} isEndGameView={isEndGameView} shotChartSource={shotChartSource} />;
+  if (screen === 'gameLog') return <GameLog log={gameLog} onBack={() => setScreen('game')} darkMode={darkMode} theme={theme} currentGame={currentGame} onDeleteStat={deleteStatAtIndex} onInsertStat={insertStatAtIndex} onInsertEndPeriod={insertEndPeriodAtIndex} insertStatMode={insertStatMode} setInsertStatMode={setInsertStatMode} focusedStatIndex={focusedStatIndex} setFocusedStatIndex={setFocusedStatIndex} currentPeriod={currentPeriod} />;
+  if (screen === 'viewGames') return <ViewGames games={games} onViewGame={viewGame} onBack={() => setScreen('home')} onDeleteGame={deleteGame} darkMode={darkMode} theme={theme} />;
+  if (screen === 'viewGame') return <ViewGameScreen game={currentGame} onBack={() => setScreen('viewGames')} onMainMenu={() => setScreen('home')} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} darkMode={darkMode} theme={theme} onViewShotChart={(idx) => { setViewingShotChart({ type: idx === 'team' ? 'team' : 'player', playerIndex: idx }); setShotChartSource('viewGame'); setScreen('shotChart'); }} toggleDarkMode={toggleDarkMode} onViewRotations={() => viewGameRotations(currentGame)} onResumeGame={() => resumeGame(currentGame)} />;
+  return null;
+};
+
+const RotationsScreen = ({ game, rotations, onBack, darkMode, theme, autoDownload, onAutoDownloadDone }) => {
+  const rotationsRef = useRef(null);
+  const sorted = [...rotations].sort((a, b) => b.plusMinus - a.plusMinus);
+  const getPlayerName = (idx) => { const p = game.players[idx]; return p ? p.name : `Player ${idx}`; };
+  const fgPct = (m, a) => a === 0 ? '-' : `${Math.round((m / a) * 100)}% [${m}/${a}]`;
+  const signed = (v) => v > 0 ? `+${v}` : `${v}`;
+  const signColor = (v) => v > 0 ? 'text-green-500' : v < 0 ? 'text-red-500' : '';
+
+  const exportJPG = async () => {
+    if (!rotationsRef.current) return;
+    try {
+      const canvas = await html2canvas(rotationsRef.current, { backgroundColor: darkMode ? '#1f2937' : '#ffffff', scale: 2 });
+      const link = document.createElement('a');
+      link.download = `${game.date} - ${game.teamName} - Rotations.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    } catch (e) { console.error('Export failed:', e); }
+  };
+
+  const exportCSV = () => {
+    const headers = ['Lineup', 'Count', '+/-', 'REB±', 'TO±', 'Team FG%', 'Opp FG%'];
+    const rows = [`${game.teamName} — Rotations`, `${game.date}`, '', headers.join(',')];
+    sorted.forEach(rot => {
+      const lineup = rot.players.map(i => getPlayerName(i)).join(' / ');
+      rows.push([`"${lineup}"`, rot.count, rot.plusMinus >= 0 ? `+${rot.plusMinus}` : rot.plusMinus, rot.rebDiff >= 0 ? `+${rot.rebDiff}` : rot.rebDiff, rot.toDiff >= 0 ? `+${rot.toDiff}` : rot.toDiff, `"${fgPct(rot.teamFGMade, rot.teamFGAtt)}"`, `"${fgPct(rot.oppFGMade, rot.oppFGAtt)}"`].join(','));
+    });
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.download = `${game.date} - ${game.teamName} - Rotations.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  };
+
+  useEffect(() => {
+    if (autoDownload) {
+      const timer = setTimeout(() => {
+        exportJPG().then(() => {
+          if (onAutoDownloadDone) onAutoDownloadDone();
+        });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [autoDownload]);
+
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-6xl mx-auto`}>
+      <div className="flex justify-between items-center mb-4">
+        <button onClick={onBack} className="flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> Back</button>
+        <div className="flex gap-2">
+          <button onClick={exportJPG} className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 flex items-center gap-1 text-sm"><Download size={16} /> JPG</button>
+          <button onClick={exportCSV} className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 flex items-center gap-1 text-sm"><Download size={16} /> CSV</button>
+        </div>
+      </div>
+      <div ref={rotationsRef} className={`${theme.card} rounded-lg shadow-lg p-4`}>
+        <h2 className="text-xl font-bold mb-1">Rotations — {game.teamName} vs {game.opponentName || 'Opponent'}</h2>
+        <p className={`text-sm ${theme.textMuted} mb-4`}>{game.date} @ {game.location || 'N/A'}</p>
+        {sorted.length === 0 ? (
+          <p className={theme.textMuted}>No rotations tracked yet. Record stats during the game to populate this list.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className={darkMode ? 'bg-gray-700' : 'bg-gray-100'}>
+                  <th className="p-2 text-left">Lineup</th>
+                  <th className="p-2 text-center">Count</th>
+                  <th className="p-2 text-center">PTS+/-</th>
+                  <th className="p-2 text-center">REB±</th>
+                  <th className="p-2 text-center">TO±</th>
+                  <th className="p-2 text-center">FG%</th>
+                  <th className="p-2 text-center">Opp FG%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((rot, idx) => {
+                  const rowBg = idx % 2 === 1 ? (darkMode ? 'bg-gray-700/50' : 'bg-gray-50') : '';
+                  return (
+                    <tr key={rot.key} className={`border-b ${theme.border} ${rowBg}`}>
+                      <td className="p-2 text-xs">{rot.players.map((pi, i) => (i > 0 ? ' / ' : '') + getPlayerName(pi)).join('')}</td>
+                      <td className="p-2 text-center">{rot.count}</td>
+                      <td className={`p-2 text-center font-bold ${signColor(rot.plusMinus)}`}>{signed(rot.plusMinus)}</td>
+                      <td className={`p-2 text-center font-bold ${signColor(rot.rebDiff)}`}>{signed(rot.rebDiff)}</td>
+                      <td className={`p-2 text-center font-bold ${signColor(rot.toDiff)}`}>{signed(rot.toDiff)}</td>
+                      <td className="p-2 text-center">{fgPct(rot.teamFGMade, rot.teamFGAtt)}</td>
+                      <td className="p-2 text-center">{fgPct(rot.oppFGMade, rot.oppFGAtt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const HomeScreen = ({ onNewGame, onViewGames, darkMode, toggleDarkMode, theme }) => (
+  <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-b from-orange-500 to-orange-700'} flex items-center justify-center p-4`}>
+    <div className="absolute top-4 right-4">
+      <button onClick={toggleDarkMode} className={`p-3 rounded-full ${theme.card}`}>{darkMode ? <Sun size={24} className="text-yellow-400" /> : <Moon size={24} className="text-gray-700" />}</button>
+    </div>
+    <div className="text-center">
+      <h1 className="text-5xl font-bold text-white mb-8">🏀 Basketball Stats</h1>
+      <div className="space-y-4">
+        <button onClick={onNewGame} className={`w-64 ${darkMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-white hover:bg-gray-100 text-orange-600'} px-8 py-4 rounded-lg text-xl font-bold flex items-center justify-center gap-2 mx-auto`}><Plus size={24} /> Create New Game</button>
+        <button onClick={onViewGames} className={`w-64 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-orange-800 hover:bg-orange-900'} text-white px-8 py-4 rounded-lg text-xl font-bold flex items-center justify-center gap-2 mx-auto`}><Eye size={24} /> View Previous Games</button>
+      </div>
+    </div>
+  </div>
+);
+
+const GameSetup = ({ onStart, onBack, games, darkMode, theme }) => {
+  const [teamName, setTeamName] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [opponent, setOpponent] = useState('');
+  const [location, setLocation] = useState('');
+  const [players, setPlayers] = useState([{ number: '', name: '' }]);
+  const [importGameId, setImportGameId] = useState('');
+  const [enableShotChart, setEnableShotChart] = useState(true);
+
+  const addPlayer = () => setPlayers([...players, { number: '', name: '' }]);
+  const updatePlayer = (idx, field, value) => { const updated = [...players]; updated[idx][field] = value; setPlayers(updated); };
+  const removePlayer = (idx) => { if (players.length > 1) setPlayers(players.filter((_, i) => i !== idx)); };
+  const importPlayers = () => { const game = games.find(g => g.id === parseInt(importGameId)); if (game) setPlayers(game.players.map(p => ({ number: p.number, name: p.name }))); };
+  const handleStart = () => { if (teamName && opponent && players.some(p => p.number && p.name)) onStart({ teamName, date, opponent, location, players: players.filter(p => p.number && p.name), enableShotChart }); };
+
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-2xl mx-auto`}>
+      <button onClick={onBack} className="mb-4 flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> Back</button>
+      <div className={`${theme.card} rounded-lg shadow-lg p-6 space-y-4`}>
+        <h2 className="text-2xl font-bold">New Game Setup</h2>
+        <input type="text" placeholder="Team Name" value={teamName} onChange={(e) => setTeamName(e.target.value)} className={`w-full p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`w-full p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+        <input type="text" placeholder="Opponent" value={opponent} onChange={(e) => setOpponent(e.target.value)} className={`w-full p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+        <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className={`w-full p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" checked={enableShotChart} onChange={(e) => setEnableShotChart(e.target.checked)} className="w-5 h-5 accent-orange-500" />
+          <span>Enable Shot Chart Tracking</span>
+        </label>
+        {games.length > 0 && (
+          <div className="flex gap-2">
+            <select value={importGameId} onChange={(e) => setImportGameId(e.target.value)} className={`flex-1 p-3 border rounded ${theme.inputBg} ${theme.border}`}>
+              <option value="">Import players from previous game...</option>
+              {games.map(g => <option key={g.id} value={g.id}>{g.teamName} vs {g.opponentName || 'Unknown'} ({g.date})</option>)}
+            </select>
+            <button onClick={importPlayers} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Import</button>
+          </div>
+        )}
+        <h3 className="text-xl font-bold mt-4">Players</h3>
+        {players.map((p, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input type="text" placeholder="#" value={p.number} onChange={(e) => updatePlayer(idx, 'number', e.target.value)} className={`w-20 p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+            <input type="text" placeholder="Player Name" value={p.name} onChange={(e) => updatePlayer(idx, 'name', e.target.value)} className={`flex-1 p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+            {players.length > 1 && <button onClick={() => removePlayer(idx)} className="bg-red-500 text-white px-3 rounded hover:bg-red-600"><X size={18} /></button>}
+          </div>
+        ))}
+        <button onClick={addPlayer} className={`w-full ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} px-4 py-3 rounded`}>+ Add Player</button>
+        <button onClick={handleStart} className="w-full bg-orange-600 text-white px-6 py-4 rounded-lg text-lg font-bold hover:bg-orange-700">Start Game</button>
+      </div>
+    </div>
+  );
+};
+
+const BoxScore = ({ game, onBack, onMainMenu, filterPeriod, setFilterPeriod, darkMode, theme, onViewShotChart, toggleDarkMode, isEndGameView, calculatePlayerPoints, getPlayerRebounds, gameLog, rotations = [], onViewRotations, onDownloadRotationsJPG }) => {
+  const boxScoreRef = useRef(null);
+  const shotChartRef = useRef(null);
+  const getFilteredStats = (entity) => filterPeriod === 'Total' ? entity.stats || {} : entity.periodStats?.[parseInt(filterPeriod)] || {};
+
+  const calculateTeamTotals = () => {
+    const totals = {};
+    game.players.forEach(player => {
+      const stats = getFilteredStats(player);
+      Object.keys(stats).forEach(key => { totals[key] = (totals[key] || 0) + (stats[key] || 0); });
+    });
+    return totals;
+  };
+
+  const formatShooting = (made, missed) => {
+    const total = made + missed;
+    if (total === 0) return '';
+    return `${made}/${total} (${Math.round((made / total) * 100)}%)`;
+  };
+
+  const getSortedPlayers = () => {
+    if (!isEndGameView) return game.players.map((p, idx) => ({ ...p, originalIndex: idx }));
+    return game.players.map((p, idx) => ({ ...p, originalIndex: idx })).sort((a, b) => {
+      const aPoints = calculatePlayerPoints(a);
+      const bPoints = calculatePlayerPoints(b);
+      if (bPoints !== aPoints) return bPoints - aPoints;
+      const aReb = getPlayerRebounds(a);
+      const bReb = getPlayerRebounds(b);
+      if (bReb !== aReb) return bReb - aReb;
+      const aAst = a.stats?.Ast || 0;
+      const bAst = b.stats?.Ast || 0;
+      return bAst - aAst;
+    });
+  };
+
+  const sortedPlayers = getSortedPlayers();
+  const teamTotals = calculateTeamTotals();
+  const opponentStats = getFilteredStats(game.opponent);
+  const teamScore = (teamTotals['2ptMade'] || 0) * 2 + (teamTotals['3ptMade'] || 0) * 3 + (teamTotals['FTMade'] || 0);
+  const oppScore = (opponentStats['2ptMade'] || 0) * 2 + (opponentStats['3ptMade'] || 0) * 3 + (opponentStats['FTMade'] || 0);
+  const periods = []; for (let i = 1; i <= (game.maxPeriod || 1); i++) periods.push(i);
+  const opponentName = game.opponentName || 'Opponent';
+
+  const getFilenameBase = () => `${game.date} - ${game.teamName} v ${opponentName}`;
+
+  const qualityLabel = (q) => {
+    if (q === 'A' || q === 1) return 'A';
+    if (q === 'B' || q === 2) return 'B';
+    if (q === 'C' || q === 3) return 'C';
+    return q;
+  };
+
+  const getAllTeamShots = () => game.players.flatMap((p, idx) => (p.shotChart || []).map(shot => ({ ...shot, playerIndex: idx, playerName: `#${p.number} ${p.name}` })));
+  const allShots = getAllTeamShots();
+  const madeCount = allShots.filter(s => s.made).length;
+  const missedCount = allShots.filter(s => !s.made).length;
+  const fgPct = madeCount + missedCount > 0 ? Math.round((madeCount / (madeCount + missedCount)) * 100) : 0;
+
+  const exportBoxScoreJPG = async () => {
+    if (!boxScoreRef.current) return;
+    try {
+      const canvas = await html2canvas(boxScoreRef.current, { backgroundColor: darkMode ? '#1f2937' : '#ffffff', scale: 2 });
+      const link = document.createElement('a');
+      link.download = `${getFilenameBase()} - Box Score.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    } catch (e) { console.error('Export failed:', e); }
+  };
+
+  const exportBoxScoreCSV = () => {
+    const getQualityStr = (shots, q) => {
+      const qShots = shots.filter(s => qualityLabel(s.quality) === q);
+      const qMade = qShots.filter(s => s.made).length;
+      const qPct = qShots.length > 0 ? Math.round((qMade / qShots.length) * 100) : 0;
+      return `${q}: ${qMade}/${qShots.length} ${qPct}%`;
+    };
+
+    const headers = ['Player', 'FGM', 'FGA', 'FG%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'LTO', 'DTO', 'FJB', 'CJB', 'PF', 'PTS', '+/-', 'Quality A', 'Quality B', 'Quality C'];
+    const rows = [`${game.teamName} v ${opponentName} - Box Score`, `${game.date} @ ${game.location || 'N/A'}`, '', headers.join(',')];
+
+    sortedPlayers.forEach(player => {
+      const stats = getFilteredStats(player);
+      const fgMade = (stats['2ptMade'] || 0) + (stats['3ptMade'] || 0);
+      const fgMiss = (stats['2ptMiss'] || 0) + (stats['3ptMiss'] || 0);
+      const fgPct = fgMade + fgMiss > 0 ? Math.round((fgMade / (fgMade + fgMiss)) * 100) : 0;
+      const threePct = (stats['3ptMade'] || 0) + (stats['3ptMiss'] || 0) > 0 ? Math.round(((stats['3ptMade'] || 0) / ((stats['3ptMade'] || 0) + (stats['3ptMiss'] || 0))) * 100) : 0;
+      const ftPct = (stats['FTMade'] || 0) + (stats['FTMiss'] || 0) > 0 ? Math.round(((stats['FTMade'] || 0) / ((stats['FTMade'] || 0) + (stats['FTMiss'] || 0))) * 100) : 0;
+      const points = (stats['2ptMade'] || 0) * 2 + (stats['3ptMade'] || 0) * 3 + (stats['FTMade'] || 0);
+      const playerShots = player.shotChart || [];
+      rows.push([
+        `"#${player.number} ${player.name}"`, fgMade, fgMade + fgMiss, `${fgPct}%`,
+        stats['3ptMade'] || 0, (stats['3ptMade'] || 0) + (stats['3ptMiss'] || 0), `${threePct}%`,
+        stats['FTMade'] || 0, (stats['FTMade'] || 0) + (stats['FTMiss'] || 0), `${ftPct}%`,
+        stats['OffReb'] || 0, stats['DefReb'] || 0, stats['Ast'] || 0, stats['Stl'] || 0, stats['Blk'] || 0,
+        stats['LiveTO'] || 0, stats['DeadTO'] || 0, stats['ForceJB'] || 0, stats['ConcedeJB'] || 0, stats['Foul'] || 0, points, player.stats?.plusMinus || 0,
+        `"${getQualityStr(playerShots, 'A')}"`, `"${getQualityStr(playerShots, 'B')}"`, `"${getQualityStr(playerShots, 'C')}"`
+      ].join(','));
+    });
+
+    // Team totals
+    const tfgMade = (teamTotals['2ptMade'] || 0) + (teamTotals['3ptMade'] || 0);
+    const tfgMiss = (teamTotals['2ptMiss'] || 0) + (teamTotals['3ptMiss'] || 0);
+    const tfgPct = tfgMade + tfgMiss > 0 ? Math.round((tfgMade / (tfgMade + tfgMiss)) * 100) : 0;
+    const t3Pct = (teamTotals['3ptMade'] || 0) + (teamTotals['3ptMiss'] || 0) > 0 ? Math.round(((teamTotals['3ptMade'] || 0) / ((teamTotals['3ptMade'] || 0) + (teamTotals['3ptMiss'] || 0))) * 100) : 0;
+    const tftPct = (teamTotals['FTMade'] || 0) + (teamTotals['FTMiss'] || 0) > 0 ? Math.round(((teamTotals['FTMade'] || 0) / ((teamTotals['FTMade'] || 0) + (teamTotals['FTMiss'] || 0))) * 100) : 0;
+    rows.push([
+      '"TEAM"', tfgMade, tfgMade + tfgMiss, `${tfgPct}%`,
+      teamTotals['3ptMade'] || 0, (teamTotals['3ptMade'] || 0) + (teamTotals['3ptMiss'] || 0), `${t3Pct}%`,
+      teamTotals['FTMade'] || 0, (teamTotals['FTMade'] || 0) + (teamTotals['FTMiss'] || 0), `${tftPct}%`,
+      teamTotals['OffReb'] || 0, teamTotals['DefReb'] || 0, teamTotals['Ast'] || 0, teamTotals['Stl'] || 0, teamTotals['Blk'] || 0,
+      teamTotals['LiveTO'] || 0, teamTotals['DeadTO'] || 0, teamTotals['ForceJB'] || 0, teamTotals['ConcedeJB'] || 0, teamTotals['Foul'] || 0, teamScore,
+      `"${getQualityStr(allShots, 'A')}"`, `"${getQualityStr(allShots, 'B')}"`, `"${getQualityStr(allShots, 'C')}"`
+    ].join(','));
+
+    // Opponent
+    const ofgMade = (opponentStats['2ptMade'] || 0) + (opponentStats['3ptMade'] || 0);
+    const ofgMiss = (opponentStats['2ptMiss'] || 0) + (opponentStats['3ptMiss'] || 0);
+    const ofgPct = ofgMade + ofgMiss > 0 ? Math.round((ofgMade / (ofgMade + ofgMiss)) * 100) : 0;
+    const o3Pct = (opponentStats['3ptMade'] || 0) + (opponentStats['3ptMiss'] || 0) > 0 ? Math.round(((opponentStats['3ptMade'] || 0) / ((opponentStats['3ptMade'] || 0) + (opponentStats['3ptMiss'] || 0))) * 100) : 0;
+    const oftPct = (opponentStats['FTMade'] || 0) + (opponentStats['FTMiss'] || 0) > 0 ? Math.round(((opponentStats['FTMade'] || 0) / ((opponentStats['FTMade'] || 0) + (opponentStats['FTMiss'] || 0))) * 100) : 0;
+    rows.push([
+      '"OPPONENT"', ofgMade, ofgMade + ofgMiss, `${ofgPct}%`,
+      opponentStats['3ptMade'] || 0, (opponentStats['3ptMade'] || 0) + (opponentStats['3ptMiss'] || 0), `${o3Pct}%`,
+      opponentStats['FTMade'] || 0, (opponentStats['FTMade'] || 0) + (opponentStats['FTMiss'] || 0), `${oftPct}%`,
+      opponentStats['OffReb'] || 0, opponentStats['DefReb'] || 0, opponentStats['Ast'] || 0, opponentStats['Stl'] || 0, opponentStats['Blk'] || 0,
+      opponentStats['LiveTO'] || 0, opponentStats['DeadTO'] || 0, opponentStats['ForceJB'] || 0, opponentStats['ConcedeJB'] || 0, opponentStats['Foul'] || 0, oppScore,
+      '""', '""', '""'
+    ].join(','));
+
+    // Rotations tab
+    if (rotations && rotations.length > 0) {
+      rows.push('', '', '--- ROTATIONS ---', '');
+      rows.push(['Lineup', 'Count', '+/-', 'REB±', 'TO±', 'Team FG%', 'Opp FG%'].join(','));
+      const rotFgPct = (m, a) => a === 0 ? '-' : `${Math.round((m / a) * 100)}% [${m}/${a}]`;
+      [...rotations].sort((a, b) => b.plusMinus - a.plusMinus).forEach(rot => {
+        const lineup = rot.players.map(i => { const p = game.players[i]; return p ? p.name : `Player ${i}`; }).join(' / ');
+        const pm = rot.plusMinus >= 0 ? `+${rot.plusMinus}` : `${rot.plusMinus}`;
+        const reb = rot.rebDiff >= 0 ? `+${rot.rebDiff}` : `${rot.rebDiff}`;
+        const to = rot.toDiff >= 0 ? `+${rot.toDiff}` : `${rot.toDiff}`;
+        rows.push([`"${lineup}"`, rot.count, pm, reb, to, `"${rotFgPct(rot.teamFGMade, rot.teamFGAtt)}"`, `"${rotFgPct(rot.oppFGMade, rot.oppFGAtt)}"`].join(','));
+      });
+    }
+
+    // Game Log section
+    if (gameLog && gameLog.length > 0) {
+      rows.push('', '', '--- GAME LOG ---', '');
+      rows.push(['Period', 'Entry'].join(','));
+      [...gameLog].reverse().forEach(entry => {
+        rows.push([`"Q${entry.period}"`, `"${(entry.text || '').replace(/"/g, '""')}"`].join(','));
+      });
+    }
+
+    const csv = rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.download = `${getFilenameBase()} - Box Score.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  };
+
+  const exportShotChartJPG = async () => {
+    if (!shotChartRef.current) return;
+    try {
+      const canvas = await html2canvas(shotChartRef.current, { backgroundColor: darkMode ? '#1f2937' : '#ffffff', scale: 2 });
+      const link = document.createElement('a');
+      link.download = `${getFilenameBase()} - Shot Chart.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    } catch (e) { console.error('Export failed:', e); }
+  };
+
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-6xl mx-auto`}>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> {isEndGameView ? 'Home' : 'Back'}</button>
+          {!isEndGameView && <button onClick={onMainMenu} className="bg-gray-600 text-white px-3 py-1.5 rounded hover:bg-gray-700 text-sm">Main Menu</button>}
+        </div>
+        <button onClick={toggleDarkMode} className={`p-2 rounded-full ${theme.card}`}>{darkMode ? <Sun size={20} /> : <Moon size={20} />}</button>
+      </div>
+      <div className="bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg shadow-lg p-4 mb-4 text-white">
+        <div className="flex justify-between items-center">
+          <div className="text-center flex-1"><div className="text-sm font-medium opacity-90">{game.teamName}</div><div className="text-4xl font-bold">{teamScore}</div></div>
+          <div className="text-center px-4"><div className="text-lg font-semibold">vs</div><div className="text-xs opacity-75">{filterPeriod === 'Total' ? 'Final' : `Q${filterPeriod}`}</div></div>
+          <div className="text-center flex-1"><div className="text-sm font-medium opacity-90">{opponentName}</div><div className="text-4xl font-bold">{oppScore}</div></div>
+        </div>
+      </div>
+      {isEndGameView && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button onClick={exportBoxScoreJPG} className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 flex items-center gap-1 text-sm"><Download size={16} /> Box Score JPG</button>
+          <button onClick={exportBoxScoreCSV} className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 flex items-center gap-1 text-sm"><Download size={16} /> Box Score CSV</button>
+          {game.enableShotChart && <button onClick={exportShotChartJPG} className="bg-cyan-600 text-white px-3 py-2 rounded hover:bg-cyan-700 flex items-center gap-1 text-sm"><Download size={16} /> Shot Chart JPG</button>}
+          {onViewRotations && <button onClick={onViewRotations} className="bg-teal-600 text-white px-3 py-2 rounded hover:bg-teal-700 flex items-center gap-1 text-sm">View Rotations</button>}
+          {onDownloadRotationsJPG && <button onClick={onDownloadRotationsJPG} className="bg-teal-700 text-white px-3 py-2 rounded hover:bg-teal-800 flex items-center gap-1 text-sm"><Download size={16} /> Rotations JPG</button>}
+        </div>
+      )}
+      <div ref={boxScoreRef} className={`${theme.card} rounded-lg shadow-lg p-4`}>
+        <h2 className="text-xl font-bold mb-1">{game.teamName} v {opponentName} - Box Score</h2>
+        <p className={`text-sm ${theme.textMuted} mb-4`}>{game.date} @ {game.location || 'N/A'}</p>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {periods.map(period => (<button key={period} onClick={() => setFilterPeriod(String(period))} className={`px-4 py-2 rounded ${filterPeriod === String(period) ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Q{period}</button>))}
+          <button onClick={() => setFilterPeriod('Total')} className={`px-4 py-2 rounded ${filterPeriod === 'Total' ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Total</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className={darkMode ? 'bg-gray-700' : 'bg-gray-100'}>
+                <th className="p-2 text-left">Player</th><th className="p-2">FG</th><th className="p-2">3PT</th><th className="p-2">FT</th>
+                {isEndGameView ? <th className="p-2">REB</th> : <><th className="p-2">OREB</th><th className="p-2">DREB</th></>}
+                <th className="p-2">AST</th><th className="p-2">STL</th><th className="p-2">BLK</th>
+                {isEndGameView ? <th className="p-2">TO</th> : <><th className="p-2">LTO</th><th className="p-2">DTO</th></>}
+                <th className="p-2">FJB</th><th className="p-2">CJB</th><th className="p-2">PF</th><th className="p-2">PTS</th><th className="p-2">+/-</th>
+                {game.enableShotChart && <th className="p-2">📊</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedPlayers.map((player, idx) => {
+                const stats = getFilteredStats(player);
+                const fgMade = (stats['2ptMade'] || 0) + (stats['3ptMade'] || 0);
+                const fgMiss = (stats['2ptMiss'] || 0) + (stats['3ptMiss'] || 0);
+                const points = (stats['2ptMade'] || 0) * 2 + (stats['3ptMade'] || 0) * 3 + (stats['FTMade'] || 0);
+                const oreb = stats['OffReb'] || 0;
+                const dreb = stats['DefReb'] || 0;
+                const lto = stats['LiveTO'] || 0;
+                const dto = stats['DeadTO'] || 0;
+                const rowBg = idx % 2 === 1 ? (darkMode ? 'bg-gray-700/50' : 'bg-gray-50') : '';
+                return (
+                  <tr key={player.originalIndex} className={`border-b ${theme.border} ${rowBg}`}>
+                    <td className="p-2 font-semibold whitespace-nowrap">#{player.number} {player.name}</td>
+                    <td className="p-2 text-center">{formatShooting(fgMade, fgMiss)}</td>
+                    <td className="p-2 text-center">{formatShooting(stats['3ptMade'] || 0, stats['3ptMiss'] || 0)}</td>
+                    <td className="p-2 text-center">{formatShooting(stats['FTMade'] || 0, stats['FTMiss'] || 0)}</td>
+                    {isEndGameView ? (
+                      <td className="p-2 text-center"><div>{oreb + dreb}</div><div className={`text-[10px] ${theme.textMuted}`}>({oreb}/{dreb})</div></td>
+                    ) : (
+                      <><td className="p-2 text-center">{oreb}</td><td className="p-2 text-center">{dreb}</td></>
+                    )}
+                    <td className="p-2 text-center">{stats['Ast'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Stl'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Blk'] || 0}</td>
+                    {isEndGameView ? (
+                      <td className="p-2 text-center"><div>{lto + dto}</div><div className={`text-[10px] ${theme.textMuted}`}>({lto}/{dto})</div></td>
+                    ) : (
+                      <><td className="p-2 text-center">{lto}</td><td className="p-2 text-center">{dto}</td></>
+                    )}
+                    <td className="p-2 text-center">{stats['ForceJB'] || 0}</td>
+                    <td className="p-2 text-center">{stats['ConcedeJB'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Foul'] || 0}</td>
+                    <td className="p-2 text-center font-bold">{points}</td>
+                    <td className={`p-2 text-center font-bold ${(player.stats?.plusMinus || 0) > 0 ? 'text-green-500' : (player.stats?.plusMinus || 0) < 0 ? 'text-red-500' : ''}`}>{(player.stats?.plusMinus || 0) > 0 ? '+' : ''}{player.stats?.plusMinus || 0}</td>
+                    {game.enableShotChart && <td className="p-2 text-center"><button onClick={() => onViewShotChart(player.originalIndex)} className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700">View</button></td>}
+                  </tr>
+                );
+              })}
+              <tr className={`font-bold ${darkMode ? 'bg-orange-900/50' : 'bg-orange-100'}`}>
+                <td className="p-2">TEAM</td>
+                <td className="p-2 text-center">{formatShooting((teamTotals['2ptMade'] || 0) + (teamTotals['3ptMade'] || 0), (teamTotals['2ptMiss'] || 0) + (teamTotals['3ptMiss'] || 0))}</td>
+                <td className="p-2 text-center">{formatShooting(teamTotals['3ptMade'] || 0, teamTotals['3ptMiss'] || 0)}</td>
+                <td className="p-2 text-center">{formatShooting(teamTotals['FTMade'] || 0, teamTotals['FTMiss'] || 0)}</td>
+                {isEndGameView ? (
+                  <td className="p-2 text-center"><div>{(teamTotals['OffReb'] || 0) + (teamTotals['DefReb'] || 0)}</div><div className={`text-[10px] ${theme.textMuted}`}>({teamTotals['OffReb'] || 0}/{teamTotals['DefReb'] || 0})</div></td>
+                ) : (
+                  <><td className="p-2 text-center">{teamTotals['OffReb'] || 0}</td><td className="p-2 text-center">{teamTotals['DefReb'] || 0}</td></>
+                )}
+                <td className="p-2 text-center">{teamTotals['Ast'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Stl'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Blk'] || 0}</td>
+                {isEndGameView ? (
+                  <td className="p-2 text-center"><div>{(teamTotals['LiveTO'] || 0) + (teamTotals['DeadTO'] || 0)}</div><div className={`text-[10px] ${theme.textMuted}`}>({teamTotals['LiveTO'] || 0}/{teamTotals['DeadTO'] || 0})</div></td>
+                ) : (
+                  <><td className="p-2 text-center">{teamTotals['LiveTO'] || 0}</td><td className="p-2 text-center">{teamTotals['DeadTO'] || 0}</td></>
+                )}
+                <td className="p-2 text-center">{teamTotals['ForceJB'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['ConcedeJB'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Foul'] || 0}</td>
+                <td className="p-2 text-center">{teamScore}</td>
+                <td className="p-2 text-center"></td>
+                {game.enableShotChart && <td className="p-2 text-center"><button onClick={() => onViewShotChart('team')} className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700">Team</button></td>}
+              </tr>
+              <tr className={`font-bold ${darkMode ? 'bg-yellow-900/50' : 'bg-yellow-100'}`}>
+                <td className="p-2">OPP</td>
+                <td className="p-2 text-center">{formatShooting((opponentStats['2ptMade'] || 0) + (opponentStats['3ptMade'] || 0), (opponentStats['2ptMiss'] || 0) + (opponentStats['3ptMiss'] || 0))}</td>
+                <td className="p-2 text-center">{formatShooting(opponentStats['3ptMade'] || 0, opponentStats['3ptMiss'] || 0)}</td>
+                <td className="p-2 text-center">{formatShooting(opponentStats['FTMade'] || 0, opponentStats['FTMiss'] || 0)}</td>
+                {isEndGameView ? (
+                  <td className="p-2 text-center"><div>{(opponentStats['OffReb'] || 0) + (opponentStats['DefReb'] || 0)}</div><div className={`text-[10px] ${theme.textMuted}`}>({opponentStats['OffReb'] || 0}/{opponentStats['DefReb'] || 0})</div></td>
+                ) : (
+                  <><td className="p-2 text-center">{opponentStats['OffReb'] || 0}</td><td className="p-2 text-center">{opponentStats['DefReb'] || 0}</td></>
+                )}
+                <td className="p-2 text-center">{opponentStats['Ast'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Stl'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Blk'] || 0}</td>
+                {isEndGameView ? (
+                  <td className="p-2 text-center"><div>{(opponentStats['LiveTO'] || 0) + (opponentStats['DeadTO'] || 0)}</div><div className={`text-[10px] ${theme.textMuted}`}>({opponentStats['LiveTO'] || 0}/{opponentStats['DeadTO'] || 0})</div></td>
+                ) : (
+                  <><td className="p-2 text-center">{opponentStats['LiveTO'] || 0}</td><td className="p-2 text-center">{opponentStats['DeadTO'] || 0}</td></>
+                )}
+                <td className="p-2 text-center">{opponentStats['ForceJB'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['ConcedeJB'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Foul'] || 0}</td>
+                <td className="p-2 text-center">{oppScore}</td>
+                <td className="p-2 text-center"></td>
+                {game.enableShotChart && <td className="p-2"></td>}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className={`text-xs ${theme.textMuted} mt-4`}>{game.date} • {game.location}</p>
+      </div>
+      {isEndGameView && game.enableShotChart && allShots.length > 0 && (
+        <div ref={shotChartRef} className={`${theme.card} rounded-lg shadow-lg p-4 mt-4`}>
+          <h2 className="text-xl font-bold mb-1">{game.teamName} v {opponentName} - Shot Chart</h2>
+          <p className={`text-sm ${theme.textMuted} mb-2`}>{game.date} @ {game.location || 'N/A'}</p>
+          <p className={`text-sm ${theme.textMuted} mb-4`}>{madeCount}/{madeCount + missedCount} FG ({fgPct}%)</p>
+          <div className="relative bg-orange-200 rounded-lg mx-auto" style={{ aspectRatio: '1/1', maxWidth: '400px' }}>
+            <svg viewBox="0 0 50 50" className="w-full h-full">
+              <rect x="0" y="0" width="50" height="50" fill="#CD853F" stroke="#fff" strokeWidth="0.5"/>
+              <rect x="0" y="17" width="19" height="16" fill="none" stroke="#fff" strokeWidth="0.3"/>
+              <circle cx="19" cy="25" r="6" fill="none" stroke="#fff" strokeWidth="0.3"/>
+              <path d="M 0 3 L 14 3 A 23.75 23.75 0 0 1 14 47 L 0 47" fill="none" stroke="#fff" strokeWidth="0.3"/>
+              <path d="M 4 21 A 4 4 0 0 1 4 29" fill="none" stroke="#fff" strokeWidth="0.3"/>
+              <circle cx="5.25" cy="25" r="0.75" fill="none" stroke="#fff" strokeWidth="0.3"/>
+              <line x1="4" y1="22" x2="4" y2="28" stroke="#fff" strokeWidth="0.5"/>
+              <line x1="0" y1="19" x2="19" y2="19" stroke="#fff" strokeWidth="0.2"/>
+              <line x1="0" y1="31" x2="19" y2="31" stroke="#fff" strokeWidth="0.2"/>
+              {allShots.map((shot, idx) => {
+                const cx = shot.x * 0.5;
+                const cy = shot.y * 0.5;
+                const color = shot.made ? '#22c55e' : '#ef4444';
+                return <text key={idx} x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="2.5" fontWeight="bold" stroke="#fff" strokeWidth="0.1">{qualityLabel(shot.quality)}</text>;
+              })}
+            </svg>
+          </div>
+          <div className="flex justify-center gap-6 mt-4">
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-green-500"></div><span className="text-sm">Made</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 flex items-center justify-center text-red-500 font-bold">✕</div><span className="text-sm">Missed</span></div>
+          </div>
+          <div className={`mt-4 p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+            <h4 className="font-bold mb-2">Shot Quality Breakdown</h4>
+            <div className="grid grid-cols-3 gap-4 text-center text-sm">
+              {['A', 'B', 'C'].map(q => {
+                const qShots = allShots.filter(s => qualityLabel(s.quality) === q);
+                const qMade = qShots.filter(s => s.made).length;
+                const qPct = qShots.length > 0 ? Math.round((qMade / qShots.length) * 100) : 0;
+                return (<div key={q}><div className={`font-bold ${q === 'A' ? 'text-green-500' : q === 'B' ? 'text-yellow-500' : 'text-red-500'}`}>Quality {q}</div><div>{qMade}/{qShots.length} ({qPct}%)</div></div>);
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ViewGameScreen = ({ game, onBack, onMainMenu, filterPeriod, setFilterPeriod, darkMode, theme, onViewShotChart, toggleDarkMode, onViewRotations, onResumeGame }) => {
+  const getFilteredStats = (entity) => filterPeriod === 'Total' ? entity.stats || {} : entity.periodStats?.[parseInt(filterPeriod)] || {};
+  const calculateTeamTotals = () => {
+    const totals = {};
+    game.players.forEach(player => {
+      const stats = getFilteredStats(player);
+      Object.keys(stats).forEach(key => { totals[key] = (totals[key] || 0) + (stats[key] || 0); });
+    });
+    return totals;
+  };
+  const formatShooting = (made, missed) => {
+    const total = made + missed;
+    if (total === 0) return '';
+    return `${made}/${total} (${Math.round((made / total) * 100)}%)`;
+  };
+  const teamTotals = calculateTeamTotals();
+  const opponentStats = getFilteredStats(game.opponent);
+  const teamScore = (teamTotals['2ptMade'] || 0) * 2 + (teamTotals['3ptMade'] || 0) * 3 + (teamTotals['FTMade'] || 0);
+  const oppScore = (opponentStats['2ptMade'] || 0) * 2 + (opponentStats['3ptMade'] || 0) * 3 + (opponentStats['FTMade'] || 0);
+  const periods = []; for (let i = 1; i <= (game.maxPeriod || 1); i++) periods.push(i);
+  const opponentName = game.opponentName || 'Opponent';
+
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-6xl mx-auto`}>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> Back</button>
+          <button onClick={onMainMenu} className="bg-gray-600 text-white px-3 py-1.5 rounded hover:bg-gray-700 text-sm">Main Menu</button>
+        </div>
+        <button onClick={toggleDarkMode} className={`p-2 rounded-full ${theme.card}`}>{darkMode ? <Sun size={20} /> : <Moon size={20} />}</button>
+      </div>
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {onViewRotations && <button onClick={onViewRotations} className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700">View Rotations</button>}
+        {onResumeGame && <button onClick={onResumeGame} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Stat Accumulation</button>}
+      </div>
+      {game.enableShotChart && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button onClick={() => onViewShotChart('team')} className="bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700">Team Shot Chart</button>
+          {game.players.map((player, idx) => (
+            <button key={idx} onClick={() => onViewShotChart(idx)} className="bg-cyan-700 text-white px-3 py-2 rounded hover:bg-cyan-800 text-sm">#{player.number} {player.name}</button>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg shadow-lg p-4 mb-4 text-white">
+        <div className="flex justify-between items-center">
+          <div className="text-center flex-1"><div className="text-sm font-medium opacity-90">{game.teamName}</div><div className="text-4xl font-bold">{teamScore}</div></div>
+          <div className="text-center px-4"><div className="text-lg font-semibold">vs</div><div className="text-xs opacity-75">{filterPeriod === 'Total' ? 'Final' : `Q${filterPeriod}`}</div></div>
+          <div className="text-center flex-1"><div className="text-sm font-medium opacity-90">{opponentName}</div><div className="text-4xl font-bold">{oppScore}</div></div>
+        </div>
+      </div>
+      <div className={`${theme.card} rounded-lg shadow-lg p-4`}>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {periods.map(period => (<button key={period} onClick={() => setFilterPeriod(String(period))} className={`px-4 py-2 rounded ${filterPeriod === String(period) ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Q{period}</button>))}
+          <button onClick={() => setFilterPeriod('Total')} className={`px-4 py-2 rounded ${filterPeriod === 'Total' ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Total</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className={darkMode ? 'bg-gray-700' : 'bg-gray-100'}>
+                <th className="p-2 text-left">Player</th><th className="p-2">FG</th><th className="p-2">3PT</th><th className="p-2">FT</th><th className="p-2">OREB</th><th className="p-2">DREB</th><th className="p-2">AST</th><th className="p-2">STL</th><th className="p-2">BLK</th><th className="p-2">LTO</th><th className="p-2">DTO</th><th className="p-2">FJB</th><th className="p-2">CJB</th><th className="p-2">PF</th><th className="p-2">PTS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {game.players.map((player, idx) => {
+                const stats = getFilteredStats(player);
+                const fgMade = (stats['2ptMade'] || 0) + (stats['3ptMade'] || 0);
+                const fgMiss = (stats['2ptMiss'] || 0) + (stats['3ptMiss'] || 0);
+                const points = (stats['2ptMade'] || 0) * 2 + (stats['3ptMade'] || 0) * 3 + (stats['FTMade'] || 0);
+                const rowBg = idx % 2 === 1 ? (darkMode ? 'bg-gray-700/50' : 'bg-gray-50') : '';
+                return (
+                  <tr key={idx} className={`border-b ${theme.border} ${rowBg}`}>
+                    <td className="p-2 font-semibold whitespace-nowrap">#{player.number} {player.name}</td>
+                    <td className="p-2 text-center">{formatShooting(fgMade, fgMiss)}</td>
+                    <td className="p-2 text-center">{formatShooting(stats['3ptMade'] || 0, stats['3ptMiss'] || 0)}</td>
+                    <td className="p-2 text-center">{formatShooting(stats['FTMade'] || 0, stats['FTMiss'] || 0)}</td>
+                    <td className="p-2 text-center">{stats['OffReb'] || 0}</td>
+                    <td className="p-2 text-center">{stats['DefReb'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Ast'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Stl'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Blk'] || 0}</td>
+                    <td className="p-2 text-center">{stats['LiveTO'] || 0}</td>
+                    <td className="p-2 text-center">{stats['DeadTO'] || 0}</td>
+                    <td className="p-2 text-center">{stats['ForceJB'] || 0}</td>
+                    <td className="p-2 text-center">{stats['ConcedeJB'] || 0}</td>
+                    <td className="p-2 text-center">{stats['Foul'] || 0}</td>
+                    <td className="p-2 text-center font-bold">{points}</td>
+                  </tr>
+                );
+              })}
+              <tr className={`font-bold ${darkMode ? 'bg-orange-900/50' : 'bg-orange-100'}`}>
+                <td className="p-2">TEAM</td>
+                <td className="p-2 text-center">{formatShooting((teamTotals['2ptMade'] || 0) + (teamTotals['3ptMade'] || 0), (teamTotals['2ptMiss'] || 0) + (teamTotals['3ptMiss'] || 0))}</td>
+                <td className="p-2 text-center">{formatShooting(teamTotals['3ptMade'] || 0, teamTotals['3ptMiss'] || 0)}</td>
+                <td className="p-2 text-center">{formatShooting(teamTotals['FTMade'] || 0, teamTotals['FTMiss'] || 0)}</td>
+                <td className="p-2 text-center">{teamTotals['OffReb'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['DefReb'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Ast'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Stl'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Blk'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['LiveTO'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['DeadTO'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['ForceJB'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['ConcedeJB'] || 0}</td>
+                <td className="p-2 text-center">{teamTotals['Foul'] || 0}</td>
+                <td className="p-2 text-center">{teamScore}</td>
+              </tr>
+              <tr className={`font-bold ${darkMode ? 'bg-yellow-900/50' : 'bg-yellow-100'}`}>
+                <td className="p-2">OPP</td>
+                <td className="p-2 text-center">{formatShooting((opponentStats['2ptMade'] || 0) + (opponentStats['3ptMade'] || 0), (opponentStats['2ptMiss'] || 0) + (opponentStats['3ptMiss'] || 0))}</td>
+                <td className="p-2 text-center">{formatShooting(opponentStats['3ptMade'] || 0, opponentStats['3ptMiss'] || 0)}</td>
+                <td className="p-2 text-center">{formatShooting(opponentStats['FTMade'] || 0, opponentStats['FTMiss'] || 0)}</td>
+                <td className="p-2 text-center">{opponentStats['OffReb'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['DefReb'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Ast'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Stl'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Blk'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['LiveTO'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['DeadTO'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['ForceJB'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['ConcedeJB'] || 0}</td>
+                <td className="p-2 text-center">{opponentStats['Foul'] || 0}</td>
+                <td className="p-2 text-center">{oppScore}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className={`text-xs ${theme.textMuted} mt-4`}>{game.date} • {game.location}</p>
+      </div>
+    </div>
+  );
+};
+
+const ShotChartView = ({ game, viewingShotChart, onBack, onBoxScore, onStatAccumulation, darkMode, theme, shotChartFilter, setShotChartFilter, showQuality, setShowQuality, isEndGameView, shotChartSource }) => {
+  const isIndividual = viewingShotChart.type === 'player';
+  const getShots = () => {
+    if (viewingShotChart.type === 'team') return game.players.flatMap((p, idx) => (p.shotChart || []).map(shot => ({ ...shot, playerIndex: idx, playerName: `#${p.number} ${p.name}` })));
+    const player = game.players[viewingShotChart.playerIndex];
+    return (player.shotChart || []).map(shot => ({ ...shot, playerName: `#${player.number} ${player.name}` }));
+  };
+  const allShots = getShots();
+  const filteredShots = allShots.filter(shot => {
+    if (shotChartFilter === 'all') return true;
+    if (shotChartFilter === 'made') return shot.made;
+    if (shotChartFilter === 'missed') return !shot.made;
+    return true;
+  });
+  const playerName = viewingShotChart.type === 'team' ? game.teamName : `#${game.players[viewingShotChart.playerIndex].number} ${game.players[viewingShotChart.playerIndex].name}`;
+  const madeCount = allShots.filter(s => s.made).length;
+  const missedCount = allShots.filter(s => !s.made).length;
+  const fgPct = madeCount + missedCount > 0 ? Math.round((madeCount / (madeCount + missedCount)) * 100) : 0;
+
+  const qualityLabel = (q) => {
+    if (q === 'A' || q === 1) return 'A';
+    if (q === 'B' || q === 2) return 'B';
+    if (q === 'C' || q === 3) return 'C';
+    return q;
+  };
+
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-4xl mx-auto`}>
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        <button onClick={onBack} className="flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> Back</button>
+        {shotChartSource === 'boxScore' && <button onClick={onBoxScore} className="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 text-sm">Box Score</button>}
+        {shotChartSource === 'boxScore' && !isEndGameView && <button onClick={onStatAccumulation} className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm">Stat Entry</button>}
+      </div>
+      <div className={`${theme.card} rounded-lg shadow-lg p-4`}>
+        <h2 className="text-xl font-bold mb-2">{playerName} Shot Chart</h2>
+        <p className={`text-sm ${theme.textMuted} mb-4`}>{madeCount}/{madeCount + missedCount} FG ({fgPct}%)</p>
+        {!isIndividual && (
+          <div className="flex gap-2 mb-4 flex-wrap items-center">
+            <button onClick={() => setShotChartFilter('all')} className={`px-3 py-1 rounded text-sm ${shotChartFilter === 'all' ? 'bg-blue-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>All ({allShots.length})</button>
+            <button onClick={() => setShotChartFilter('made')} className={`px-3 py-1 rounded text-sm ${shotChartFilter === 'made' ? 'bg-green-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Made ({madeCount})</button>
+            <button onClick={() => setShotChartFilter('missed')} className={`px-3 py-1 rounded text-sm ${shotChartFilter === 'missed' ? 'bg-red-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Missed ({missedCount})</button>
+            <span className={`${theme.textMuted} px-2`}>|</span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={showQuality} onChange={(e) => setShowQuality(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+              <span className="text-sm">Show Quality</span>
+            </label>
+          </div>
+        )}
+        <div className="relative bg-orange-200 rounded-lg" style={{ aspectRatio: '1/1' }}>
+          <svg viewBox="0 0 50 50" className="w-full h-full">
+            <rect x="0" y="0" width="50" height="50" fill="#CD853F" stroke="#fff" strokeWidth="0.5"/>
+            <rect x="0" y="17" width="19" height="16" fill="none" stroke="#fff" strokeWidth="0.3"/>
+            <circle cx="19" cy="25" r="6" fill="none" stroke="#fff" strokeWidth="0.3"/>
+            <path d="M 0 3 L 14 3 A 23.75 23.75 0 0 1 14 47 L 0 47" fill="none" stroke="#fff" strokeWidth="0.3"/>
+            <path d="M 4 21 A 4 4 0 0 1 4 29" fill="none" stroke="#fff" strokeWidth="0.3"/>
+            <circle cx="5.25" cy="25" r="0.75" fill="none" stroke="#fff" strokeWidth="0.3"/>
+            <line x1="4" y1="22" x2="4" y2="28" stroke="#fff" strokeWidth="0.5"/>
+            <line x1="0" y1="19" x2="19" y2="19" stroke="#fff" strokeWidth="0.2"/>
+            <line x1="0" y1="31" x2="19" y2="31" stroke="#fff" strokeWidth="0.2"/>
+            {filteredShots.map((shot, idx) => {
+              const cx = shot.x * 0.5;
+              const cy = shot.y * 0.5;
+              const color = shot.made ? '#22c55e' : '#ef4444';
+              if (isIndividual) {
+                return <text key={idx} x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="2.5" fontWeight="bold" stroke="#fff" strokeWidth="0.1">{qualityLabel(shot.quality)}</text>;
+              }
+              if (showQuality) {
+                return <text key={idx} x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="2.5" fontWeight="bold" stroke="#fff" strokeWidth="0.1">{qualityLabel(shot.quality)}</text>;
+              }
+              if (shot.made) {
+                return <circle key={idx} cx={cx} cy={cy} r="1" fill={color} stroke="#fff" strokeWidth="0.15" opacity="0.9"/>;
+              } else {
+                return <text key={idx} x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="2" fontWeight="bold" stroke="#fff" strokeWidth="0.1">✕</text>;
+              }
+            })}
+          </svg>
+        </div>
+        <div className="flex justify-center gap-6 mt-4">
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-green-500"></div><span className="text-sm">Made</span></div>
+          <div className="flex items-center gap-2"><div className="w-4 h-4 flex items-center justify-center text-red-500 font-bold">✕</div><span className="text-sm">Missed</span></div>
+        </div>
+        <div className={`mt-4 p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+          <h4 className="font-bold mb-2">Shot Quality Breakdown</h4>
+          <div className="grid grid-cols-3 gap-4 text-center text-sm">
+            {['A', 'B', 'C'].map(q => {
+              const qShots = allShots.filter(s => qualityLabel(s.quality) === q);
+              const qMade = qShots.filter(s => s.made).length;
+              const qPct = qShots.length > 0 ? Math.round((qMade / qShots.length) * 100) : 0;
+              return (<div key={q}><div className={`font-bold ${q === 'A' ? 'text-green-500' : q === 'B' ? 'text-yellow-500' : 'text-red-500'}`}>Quality {q}</div><div>{qMade}/{qShots.length} ({qPct}%)</div></div>);
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const GameLog = ({ log, onBack, darkMode, theme, currentGame, onDeleteStat, onInsertStat, onInsertEndPeriod, insertStatMode, setInsertStatMode, focusedStatIndex, setFocusedStatIndex, currentPeriod }) => {
+  const [logFilterPeriod, setLogFilterPeriod] = useState('all');
+  const [selectedStatIndex, setSelectedStatIndex] = useState(null);
+  const [showStatModal, setShowStatModal] = useState(false);
+  const [modalMode, setModalMode] = useState(null); // 'insert_above', 'insert_below', 'edit'
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState(currentPeriod);
+  const focusedRef = useRef(null);
+
+  useEffect(() => {
+    if (focusedStatIndex !== null && focusedRef.current) {
+      focusedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusedStatIndex]);
+
+  const periods = [];
+  for (let i = 1; i <= (currentGame?.maxPeriod || currentPeriod); i++) periods.push(i);
+
+  const filteredLog = logFilterPeriod === 'all' ? log : log.filter(entry => entry.period === parseInt(logFilterPeriod));
+
+  const scrollToPeriod = (period) => {
+    setLogFilterPeriod(String(period));
+  };
+
+  const handleStatAction = (index, action) => {
+    setSelectedStatIndex(index);
+    if (action === 'delete') {
+      onDeleteStat(index);
+      setSelectedStatIndex(null);
+    } else {
+      setModalMode(action);
+      setSelectedPlayer(null);
+      setSelectedPeriod(log[index]?.period || currentPeriod);
+      setShowStatModal(true);
+    }
+  };
+
+  const handleStatSelect = (statType) => {
+    if (statType === 'endPeriod') {
+      onInsertEndPeriod(selectedStatIndex, modalMode === 'insert_above' ? 'above' : 'below', selectedPeriod);
+    } else {
+      onInsertStat(selectedStatIndex, modalMode === 'insert_above' ? 'above' : 'below', selectedPlayer, statType, selectedPeriod);
+    }
+    setShowStatModal(false);
+    setModalMode(null);
+  };
+
+  const statTypes = [
+    { key: '2ptMade', label: '2PT Made', color: 'bg-green-600' },
+    { key: '2ptMiss', label: '2PT Miss', color: 'bg-red-600' },
+    { key: '3ptMade', label: '3PT Made', color: 'bg-green-700' },
+    { key: '3ptMiss', label: '3PT Miss', color: 'bg-red-700' },
+    { key: 'FTMade', label: 'FT Made', color: 'bg-green-500' },
+    { key: 'FTMiss', label: 'FT Miss', color: 'bg-red-500' },
+    { key: 'OffReb', label: 'Off Reb', color: 'bg-yellow-600' },
+    { key: 'DefReb', label: 'Def Reb', color: 'bg-yellow-700' },
+    { key: 'Ast', label: 'Assist', color: 'bg-blue-600' },
+    { key: 'Stl', label: 'Steal', color: 'bg-indigo-600' },
+    { key: 'Blk', label: 'Block', color: 'bg-purple-600' },
+    { key: 'LiveTO', label: 'Live TO', color: 'bg-gray-600' },
+    { key: 'DeadTO', label: 'Dead TO', color: 'bg-gray-500' },
+    { key: 'Foul', label: 'Foul', color: 'bg-rose-600' },
+    { key: 'ForceJB', label: 'Force JB', color: 'bg-teal-600' },
+    { key: 'ConcedeJB', label: 'Concede JB', color: 'bg-pink-600' },
+  ];
+
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-2xl mx-auto`}>
+      <button onClick={onBack} className="mb-4 flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> Back</button>
+      <div className={`${theme.card} rounded-lg shadow-lg p-4`}>
+        <h2 className="text-2xl font-bold mb-4">Game Log</h2>
+
+        {/* Period filters */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button onClick={() => setLogFilterPeriod('all')} className={`px-3 py-1 rounded text-sm ${logFilterPeriod === 'all' ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>All</button>
+          {periods.map(period => (
+            <button key={period} onClick={() => scrollToPeriod(period)} className={`px-3 py-1 rounded text-sm ${logFilterPeriod === String(period) ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Q{period}</button>
+          ))}
+        </div>
+
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          {filteredLog.length === 0 ? <p className={theme.textMuted}>No stats recorded yet</p> : filteredLog.map((entry, idx) => {
+            const actualIndex = log.indexOf(entry);
+            const isOpponent = entry.playerIndex === 'opponent';
+            const isFocused = focusedStatIndex === actualIndex;
+
+            // Different backgrounds for team vs opponent
+            let bgClass = darkMode ? 'bg-gray-700' : 'bg-gray-50';
+            if (isOpponent) {
+              bgClass = darkMode ? 'bg-yellow-900/40' : 'bg-yellow-50';
+            } else if (entry.playerIndex !== null && entry.statType !== 'endPeriod') {
+              bgClass = darkMode ? 'bg-blue-900/30' : 'bg-blue-50';
+            }
+
+            return (
+              <div
+                key={idx}
+                ref={isFocused ? focusedRef : null}
+                className={`p-2 ${bgClass} rounded border-l-4 ${entry.statType === 'endPeriod' ? 'border-purple-600' : entry.auto ? 'border-yellow-500' : isOpponent ? 'border-yellow-600' : 'border-blue-600'} ${isFocused ? 'ring-2 ring-orange-500' : ''}`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <span className={`text-xs ${theme.textMuted}`}>Q{entry.period}</span>
+                    <p className="text-sm">{entry.text}</p>
+                  </div>
+                  <div className="flex gap-1 ml-2">
+                    <button onClick={() => handleStatAction(actualIndex, 'insert_above')} className={`p-1 rounded text-xs ${darkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-200 hover:bg-gray-300'}`} title="Insert above">
+                      <ChevronUp size={14} />
+                    </button>
+                    <button onClick={() => handleStatAction(actualIndex, 'insert_below')} className={`p-1 rounded text-xs ${darkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-200 hover:bg-gray-300'}`} title="Insert below">
+                      <ChevronDown size={14} />
+                    </button>
+                    <button onClick={() => handleStatAction(actualIndex, 'delete')} className="p-1 rounded text-xs bg-red-500 hover:bg-red-600 text-white" title="Delete">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Stat selection modal */}
+      {showStatModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className={`${theme.card} ${theme.text} rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-y-auto`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">{modalMode === 'insert_above' ? 'Insert Stat Above' : 'Insert Stat Below'}</h3>
+              <button onClick={() => { setShowStatModal(false); setModalMode(null); }} className="p-1"><X size={24} /></button>
+            </div>
+
+            {/* Period selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Period:</label>
+              <div className="flex gap-2 flex-wrap">
+                {[1,2,3,4,5,6,7,8].map(p => (
+                  <button key={p} onClick={() => setSelectedPeriod(p)} className={`px-3 py-1 rounded text-sm ${selectedPeriod === p ? 'bg-orange-600 text-white' : darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>Q{p}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Player/Opponent selector */}
+            {selectedPlayer === null ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium mb-2">Select Player:</p>
+                <button onClick={() => setSelectedPlayer('opponent')} className={`w-full p-3 rounded text-left ${darkMode ? 'bg-yellow-900/40 hover:bg-yellow-900/60' : 'bg-yellow-100 hover:bg-yellow-200'} border-2 border-yellow-600`}>
+                  Opponent
+                </button>
+                {currentGame?.players.map((player, idx) => (
+                  <button key={idx} onClick={() => setSelectedPlayer(idx)} className={`w-full p-3 rounded text-left ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}>
+                    #{player.number} {player.name}
+                  </button>
+                ))}
+                <button onClick={() => { onInsertEndPeriod(selectedStatIndex, modalMode === 'insert_above' ? 'above' : 'below', selectedPeriod); setShowStatModal(false); }} className="w-full p-3 rounded text-left bg-purple-600 text-white hover:bg-purple-700 font-medium">
+                  End Period {selectedPeriod}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <button onClick={() => setSelectedPlayer(null)} className="text-blue-500 text-sm mb-2">← Back to player selection</button>
+                <p className="text-sm font-medium mb-2">Select Stat for {selectedPlayer === 'opponent' ? 'Opponent' : `#${currentGame.players[selectedPlayer].number} ${currentGame.players[selectedPlayer].name}`}:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {statTypes.map(stat => (
+                    <button key={stat.key} onClick={() => handleStatSelect(stat.key)} className={`${stat.color} text-white p-2 rounded text-sm font-medium hover:opacity-90`}>
+                      {stat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ViewGames = ({ games, onViewGame, onBack, onDeleteGame, darkMode, theme }) => {
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const handleDelete = (gameId) => { onDeleteGame(gameId); setConfirmDelete(null); };
+  const sortedGames = [...games].sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.id - a.id));
+  return (
+    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 max-w-2xl mx-auto`}>
+      <button onClick={onBack} className="mb-4 flex items-center gap-2 text-blue-500 hover:text-blue-400"><ArrowLeft size={20} /> Back</button>
+      <div className={`${theme.card} rounded-lg shadow-lg p-6`}>
+        <h2 className="text-2xl font-bold mb-4">Previous Games</h2>
+        {games.length === 0 ? <p className={theme.textMuted}>No games recorded yet</p> : (
+          <div className="space-y-2">
+            {sortedGames.map((game) => {
+              const oppName = game.opponentName || 'Unknown';
+              return (
+                <div key={game.id} className="flex gap-2">
+                  <button onClick={() => onViewGame(game)} className={`flex-1 p-4 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} rounded-lg text-left border ${theme.border}`}>
+                    <div className="font-bold">{game.teamName} vs {oppName}</div>
+                    <div className={`text-sm ${theme.textMuted}`}>{game.date} • {game.location}</div>
+                  </button>
+                  {confirmDelete === game.id ? (
+                    <div className="flex gap-1">
+                      <button onClick={() => handleDelete(game.id)} className="bg-red-600 text-white px-3 rounded hover:bg-red-700">Confirm</button>
+                      <button onClick={() => setConfirmDelete(null)} className="bg-gray-500 text-white px-3 rounded hover:bg-gray-600">Cancel</button>
+                    </div>
+                  ) : (<button onClick={() => setConfirmDelete(game.id)} className="bg-red-500 text-white px-3 rounded hover:bg-red-600"><Trash2 size={18} /></button>)}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<BasketballStatsApp />);
+</script>
+</body>
+</html>
