@@ -69,6 +69,7 @@ const BasketballStatsApp = () => {
   const onCourtSetRef = useRef(new Set());
   const jumpBallArrowRef = useRef(null); // null=uninitialized, 'us'/'them'=who has arrow next
   const offRebPossessionRef = useRef(null); // 'us'|'them'|null — was there an OffReb in this possession
+  const techFTActiveRef = useRef(false);
   const [jumpBallPopup, setJumpBallPopup] = useState(null); // {playerIndex, statType}
   const [oppScoreCategoryPopup, setOppScoreCategoryPopup] = useState(null); // {statType}
   const [ftCategoryPopup, setFtCategoryPopup] = useState(null); // {playerIndex}
@@ -80,6 +81,7 @@ const BasketballStatsApp = () => {
   const [scoreWormBackScreen, setScoreWormBackScreen] = useState('game');
   const [summaryBackScreen, setSummaryBackScreen] = useState('game');
   const [gameLogBackScreen, setGameLogBackScreen] = useState('game');
+  const [lineupConfirmModal, setLineupConfirmModal] = useState(null);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -238,6 +240,52 @@ const BasketballStatsApp = () => {
     }
   };
 
+  const toggleLineupConfirmSelection = (idx) => {
+    setLineupConfirmModal(prev => ({
+      ...prev,
+      selections: { ...prev.selections, [idx]: !prev.selections[idx] },
+      error: ''
+    }));
+  };
+
+  const confirmLineupModal = () => {
+    const maxOnCourt = Math.min(5, currentGame.players.length);
+    const onPlayers = Object.keys(lineupConfirmModal.selections).map(Number).filter(idx => lineupConfirmModal.selections[idx]);
+    if (onPlayers.length !== maxOnCourt) {
+      setLineupConfirmModal(prev => ({ ...prev, error: `Must select exactly ${maxOnCourt} players` }));
+      return;
+    }
+    const newOnCourtSet = new Set(onPlayers);
+    setOnCourtSet(newOnCourtSet);
+    onCourtSetRef.current = newOnCourtSet;
+    const newRotKey = [...onPlayers].sort((a, b) => a - b).join(',');
+    currentRotationKeyRef.current = newRotKey;
+    currentRotationHasStatRef.current = false;
+    possStartRotKeyRef.current = newRotKey;
+    possStartPlayersRef.current = new Set(onPlayers);
+    const offPlayers = Object.keys(lineupConfirmModal.selections).map(Number).filter(idx => !lineupConfirmModal.selections[idx]);
+    const sortedOnPlayers = [...onPlayers].sort((a, b) => {
+      const aScore = calculatePlayerPoints(currentGame.players[a]) + getPlayerRebounds(currentGame.players[a]);
+      const bScore = calculatePlayerPoints(currentGame.players[b]) + getPlayerRebounds(currentGame.players[b]);
+      return bScore - aScore;
+    });
+    setPlayerOrder([...sortedOnPlayers, ...offPlayers]);
+    if (lineupConfirmModal.isPeriodTransition) {
+      const prevOnCourt = lineupConfirmModal.prevOnCourt;
+      const comingOn = onPlayers.filter(idx => !prevOnCourt.has(idx));
+      const comingOff = [...prevOnCourt].filter(idx => !onPlayers.includes(idx));
+      if (comingOn.length > 0 || comingOff.length > 0) {
+        const onNames = comingOn.map(i => `#${currentGame.players[i].number} ${currentGame.players[i].name}`).join(', ');
+        const offNames = comingOff.map(i => `#${currentGame.players[i].number} ${currentGame.players[i].name}`).join(', ');
+        let subText = 'Sub:';
+        if (onNames) subText += ` IN: ${onNames}`;
+        if (offNames) subText += ` OUT: ${offNames}`;
+        setGameLog(prev => [{ time: Date.now(), period: currentPeriod, playerIndex: -1, statType: 'Sub', text: subText }, ...prev]);
+      }
+    }
+    setLineupConfirmModal(null);
+  };
+
   const startNewGame = (gameInfo) => {
     const newGame = {
       id: Date.now(),
@@ -282,6 +330,11 @@ const BasketballStatsApp = () => {
     jumpBallArrowRef.current = null;
     offRebPossessionRef.current = null;
     setScreen('game');
+    const initialSelections = {};
+    gameInfo.players.forEach((_, idx) => {
+      initialSelections[idx] = idx < Math.min(5, gameInfo.players.length);
+    });
+    setLineupConfirmModal({ selections: initialSelections, isPeriodTransition: false, prevOnCourt: new Set(), title: 'Set Starting Lineup' });
   };
 
   const handleFieldGoalClick = (playerIndex, statType) => {
@@ -366,6 +419,10 @@ const BasketballStatsApp = () => {
   const confirmFTCategory = (category) => {
     const { playerIndex } = ftCategoryPopup;
     setFtCategoryPopup(null);
+    if (category === 'Technical') {
+      recordStat(playerIndex, 'FTMade', null, { scoreCategory: 'Technical', skipPossession: true });
+      return;
+    }
     recordStat(playerIndex, 'FTMade', null, { scoreCategory: category });
   };
 
@@ -399,7 +456,11 @@ const BasketballStatsApp = () => {
     offRebPossessionRef.current = null;
   };
 
-  const processPossession = (isOpponent, statType, updatedGame) => {
+  const processPossession = (isOpponent, statType, updatedGame, skipPossession = false) => {
+    if (skipPossession) {
+      if (statType === 'FTMade') currentPossPointsRef.current += 1;
+      return;
+    }
     const currentTeam = isOpponent ? 'them' : 'us';
     const pending = pendingPossRef.current;
     let pendingResolved = false;
@@ -595,13 +656,13 @@ const BasketballStatsApp = () => {
     }
     // Store player FT categories
     if (!isOpponent && statType === 'FTMade' && extras.scoreCategory) {
-      const ftKey = extras.scoreCategory === 'Transition' ? 'FTMade_T' : extras.scoreCategory === 'HalfCourt' ? 'FTMade_H' : 'FTMade_2C';
+      const ftKey = extras.scoreCategory === 'Transition' ? 'FTMade_T' : extras.scoreCategory === 'HalfCourt' ? 'FTMade_H' : extras.scoreCategory === 'Technical' ? 'FTMade_Tech' : 'FTMade_2C';
       player.stats[ftKey] = (player.stats[ftKey] || 0) + 1;
       if (!player.periodStats[currentPeriod]) player.periodStats[currentPeriod] = {};
       player.periodStats[currentPeriod][ftKey] = (player.periodStats[currentPeriod][ftKey] || 0) + 1;
     }
 
-    processPossession(isOpponent, statType, updatedGame);
+    processPossession(isOpponent, statType, updatedGame, extras.skipPossession || false);
     setCurrentGame(updatedGame);
   };
 
@@ -613,6 +674,13 @@ const BasketballStatsApp = () => {
       const newLog = gameLog.slice(1);
       setGameLog(newLog);
       setCurrentPeriod(lastEntry.period);
+      setLastStat(newLog.length > 0 ? { text: newLog[0].text } : null);
+      return;
+    }
+
+    if (lastEntry.statType === 'possChange') {
+      const newLog = gameLog.slice(1);
+      setGameLog(newLog);
       setLastStat(newLog.length > 0 ? { text: newLog[0].text } : null);
       return;
     }
@@ -836,7 +904,24 @@ const BasketballStatsApp = () => {
       setGameLog([{ time: Date.now(), period: currentPeriod, playerIndex: null, statType: 'endPeriod', text: endPeriodText }, ...gameLog]);
       setLastStat({ text: endPeriodText });
       setCurrentPeriod(currentPeriod + 1);
+      const lineupSelections = {};
+      currentGame.players.forEach((_, idx) => {
+        lineupSelections[idx] = onCourtSetRef.current.has(idx);
+      });
+      setLineupConfirmModal({ selections: lineupSelections, isPeriodTransition: true, prevOnCourt: new Set(onCourtSetRef.current), title: `Start Q${currentPeriod + 1} Lineup` });
     }
+  };
+
+  const changePossession = () => {
+    const updatedGame = { ...currentGame };
+    commitPossession(updatedGame);
+    pendingPossRef.current = null;
+    const newTeam = possTeamRef.current === 'us' ? 'them' : 'us';
+    startPossession(newTeam);
+    setCurrentGame(updatedGame);
+    const possText = `Poss Change → ${newTeam === 'us' ? updatedGame.teamName : (updatedGame.opponentName || 'Opponent')}`;
+    setGameLog(prev => [{ time: Date.now(), period: currentPeriod, playerIndex: null, statType: 'possChange', text: possText }, ...prev]);
+    setLastStat({ text: possText });
   };
 
   const endGame = async () => {
@@ -996,6 +1081,7 @@ const BasketballStatsApp = () => {
         <div className="flex gap-2 mb-4 items-center">
           <button onClick={undoLastStat} disabled={gameLog.length === 0} className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-50 flex items-center gap-1"><Undo size={16} /> Undo</button>
           <div className="flex-1"></div>
+          <button onClick={changePossession} className="bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 text-sm">Poss →</button>
           <button onClick={endPeriod} disabled={currentPeriod >= 8} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 disabled:opacity-50">End Period</button>
           {showEndGameConfirm ? (
             <div className="flex gap-2 items-center">
@@ -1215,11 +1301,12 @@ const BasketballStatsApp = () => {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div className={`${theme.card} ${theme.text} rounded-lg p-5 max-w-sm w-full`}>
               <h3 className="text-lg font-bold mb-4 text-center">Free Throw Type</h3>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 <button onClick={() => confirmFTCategory('Transition')} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700">Transition</button>
                 <button onClick={() => confirmFTCategory('HalfCourt')} className="flex-1 bg-orange-600 text-white py-3 rounded-lg font-bold hover:bg-orange-700">½ Court</button>
                 <button onClick={() => confirmFTCategory('2ndChance')} className="flex-1 bg-yellow-600 text-white py-3 rounded-lg font-bold hover:bg-yellow-700">2nd Chance</button>
               </div>
+              <button onClick={() => confirmFTCategory('Technical')} className="w-full bg-gray-600 text-white py-3 rounded-lg font-bold hover:bg-gray-700">Technical (no possession change)</button>
             </div>
           </div>
         )}
@@ -1251,6 +1338,35 @@ const BasketballStatsApp = () => {
               </div>
               {subModal.error && <p className="text-red-500 text-sm mb-3 font-medium">{subModal.error}</p>}
               <button onClick={confirmSub} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">OK</button>
+            </div>
+          </div>
+        )}
+        {lineupConfirmModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-60 p-4">
+            <div className={`${theme.card} ${theme.text} rounded-lg p-5 max-w-md w-full max-h-[85vh] overflow-y-auto`}>
+              <h3 className="text-lg font-bold mb-1 text-center">{lineupConfirmModal.title}</h3>
+              <p className={`text-sm text-center mb-4 ${theme.textMuted}`}>Select exactly {Math.min(5, currentGame.players.length)} players</p>
+              <div className="space-y-3 mb-4">
+                {currentGame.players.map((player, idx) => {
+                  const isOn = lineupConfirmModal.selections[idx];
+                  return (
+                    <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border}`}>
+                      <span className="font-medium">#{player.number} {player.name}</span>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`relative w-12 h-6 rounded-full cursor-pointer transition-colors ${isOn ? 'bg-green-600' : 'bg-gray-300'}`}
+                          onClick={() => toggleLineupConfirmSelection(idx)}
+                        >
+                          <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isOn ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                        </div>
+                        <span className={`text-sm font-semibold w-8 ${isOn ? 'text-green-500' : theme.textMuted}`}>{isOn ? 'ON' : 'OFF'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {lineupConfirmModal.error && <p className="text-red-500 text-sm mb-3 font-medium">{lineupConfirmModal.error}</p>}
+              <button onClick={confirmLineupModal} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">Confirm Lineup</button>
             </div>
           </div>
         )}
