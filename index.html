@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Soccer Stats Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{margin:0;font-family:system-ui,-apple-system,sans-serif}*{box-sizing:border-box}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+
+const storage={
+  async get(k){try{const v=localStorage.getItem(k);return v?{key:k,value:v}:null}catch(e){return null}},
+  async set(k,v){try{localStorage.setItem(k,v);return{key:k,value:v}}catch(e){return null}},
+  async delete(k){try{localStorage.removeItem(k);return{key:k,deleted:true}}catch(e){return null}},
+  async list(p){try{const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(p))keys.push(k)}return{keys}}catch(e){return{keys:[]}}}
+};
+
+const Plus=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const Eye=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+const ArrowLeft=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
+const Undo=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>;
+const X=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const Moon=({size=24,className=''})=><svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>;
+const Sun=({size=24,className=''})=><svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
+const Download=({size=24})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+
+const EMPTY_STATS=()=>({Gol:0,SoT:0,SoX:0,Cmp:0,Inc:0,LOP:0,Drb:0,Int:0,Tkl:0,ChalB:0,Clr:0,FC:0,FW:0,YC:0,Sav:0,Ast:0});
+const STAT_LABEL={
+  Gol:'Goal',SoT:'Shot On Target',SoX:'Shot Off Target',
+  Cmp:'Pass Complete',Inc:'Pass — Loose Ball',LOP:'Loss of Possession',
+  Drb:'Dribble',Int:'Interception',Tkl:'Challenge Won',ChalB:'Challenge — Beaten',
+  Clr:'Clearance',FC:'Foul Committed',FW:'Foul Won',YC:'Yellow Card',Sav:'Save',
+  Ast:'Assist',CK:'Corner',
+};
+// Position → column group
+const POS_COL={GK:'GK',DEF:'DEF',MID:'MID',FWD:'FWD'};
+
+/* ═══════════════════════════════ PITCH SVG ════════════════════════════════ */
+const PitchSVG=({onClick,children,cursor='default'})=>(
+  <svg viewBox="0 0 100 80" className="w-full" style={{cursor}} onClick={onClick}>
+    <rect x="0" y="0" width="100" height="80" fill="#2d7a2d"/>
+    <rect x="0" y="0"  width="100" height="13" fill="#257025"/>
+    <rect x="0" y="26" width="100" height="13" fill="#257025"/>
+    <rect x="0" y="52" width="100" height="13" fill="#257025"/>
+    <rect x="2" y="2" width="96" height="76" fill="none" stroke="white" strokeWidth="0.8"/>
+    <line x1="2" y1="40" x2="98" y2="40" stroke="white" strokeWidth="0.6"/>
+    <rect x="20" y="2" width="60" height="28" fill="none" stroke="white" strokeWidth="0.7"/>
+    <rect x="34" y="2" width="32" height="10" fill="none" stroke="white" strokeWidth="0.7"/>
+    <rect x="40" y="0" width="20" height="3" fill="rgba(255,255,255,0.25)" stroke="white" strokeWidth="0.8"/>
+    <circle cx="50" cy="22" r="0.8" fill="white"/>
+    <path d="M 36 30 A 14 14 0 0 0 64 30" fill="none" stroke="white" strokeWidth="0.6"/>
+    <circle cx="50" cy="40" r="10" fill="none" stroke="white" strokeWidth="0.6"/>
+    <circle cx="50" cy="40" r="0.8" fill="white"/>
+    <rect x="20" y="50" width="60" height="28" fill="none" stroke="white" strokeWidth="0.4" strokeDasharray="2,1"/>
+    <rect x="34" y="68" width="32" height="10" fill="none" stroke="white" strokeWidth="0.4" strokeDasharray="2,1"/>
+    {children}
+  </svg>
+);
+const ShotMarker=({shot,i})=>{
+  const cx=shot.x??50,cy=(shot.y??50)*0.8;
+  if(shot.type==='Gol')return(<g key={i}><circle cx={cx} cy={cy} r="3" fill="#22c55e" stroke="white" strokeWidth="0.6" opacity="0.92"/><text x={cx} y={cy+0.5} textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white">⚽</text></g>);
+  if(shot.type==='SoT')return <circle key={i} cx={cx} cy={cy} r="3" fill="none" stroke="#f59e0b" strokeWidth="1.4" opacity="0.92"/>;
+  return <text key={i} x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill="#ef4444" fontSize="5" fontWeight="bold" stroke="#111" strokeWidth="0.3" opacity="0.92">×</text>;
+};
+
+/* ═══════════════════════ PLAYER PICKER MODAL ══════════════════════════════ */
+const PlayerPickerModal=({players,onFieldSet,title,onPick,onClose,darkMode,th,showUnknown=true})=>{
+  const grouped={DEF:[],MID:[],FWD:[],GK:[]};
+  players.forEach((p,i)=>{const col=POS_COL[p.position]||'DEF';grouped[col].push({...p,idx:i});});
+  const byNum=(a,b)=>(parseInt(a.number)||999)-(parseInt(b.number)||999);
+  Object.keys(grouped).forEach(c=>grouped[c].sort(byNum));
+
+  const Bubble=({player,gk=false})=>{
+    const isUnk=typeof player.idx==='string';
+    const isOn=isUnk||(onFieldSet.size===0||onFieldSet.has(player.idx));
+    let cls;
+    if(gk) cls=isOn?'bg-red-700 border-2 border-red-400 text-white':'bg-red-900/50 border border-red-700 text-red-300 opacity-60';
+    else if(isUnk) cls=darkMode?'bg-gray-600/60 border border-dashed border-gray-400 text-gray-300':'bg-gray-100 border border-dashed border-gray-400 text-gray-500';
+    else cls=isOn?(darkMode?'bg-green-900 border-2 border-green-400 text-white':'bg-green-50 border-2 border-green-500 text-gray-900'):(darkMode?'bg-gray-800 border border-gray-600 text-gray-400 opacity-50':'bg-gray-100 border border-gray-300 text-gray-400 opacity-50');
+    return(
+      <button onClick={()=>onPick(player.idx)} style={{minHeight:'56px'}}
+        className={`w-full rounded-xl p-1.5 text-center transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5 ${cls}`}>
+        {!isUnk&&<div className="font-bold text-sm leading-tight">#{player.number}</div>}
+        <div className="text-xs leading-snug w-full text-center font-medium">{isUnk?'Unknown':player.name}</div>
+        {!isOn&&!gk&&!isUnk&&<div className="text-xs opacity-60">OFF</div>}
+        {isUnk&&<div className={`text-xs opacity-60`}>{player.position||player.idx?.split('-')[1]}</div>}
+      </button>
+    );
+  };
+
+  return(
+    <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center z-50">
+      <div className={`${th.card} ${th.text} w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col`} style={{maxHeight:'88vh'}}>
+        <div className={`flex justify-between items-center px-4 py-3 border-b ${th.border} flex-shrink-0`}>
+          <div className="font-bold text-base">{title}</div>
+          <button onClick={onClose} className={`p-2 rounded-full ${darkMode?'bg-gray-700':'bg-gray-100'}`}><X size={20}/></button>
+        </div>
+        <div className={`grid grid-cols-3 gap-2 px-3 pt-2 pb-1 flex-shrink-0 border-b ${th.border}`}>
+          {['DEF','MID','FWD'].map(col=>(<div key={col} className="text-center text-xs font-bold uppercase text-green-500 tracking-wide">{col}</div>))}
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className="grid grid-cols-3 gap-2 mb-2">
+            {['DEF','MID','FWD'].map(col=>(
+              <div key={col} className="space-y-1.5">
+                {grouped[col].map(p=><Bubble key={p.idx} player={p}/>)}
+                {grouped[col].length===0&&<div className={`text-xs text-center py-3 ${th.muted}`}>—</div>}
+                {showUnknown&&<Bubble key={`unk-${col}`} player={{idx:`unknown-${col}`,name:'Unknown',number:'?',position:col}}/>}
+              </div>
+            ))}
+          </div>
+          {grouped.GK.length>0&&(
+            <div className="flex justify-end mt-1">
+              <div style={{width:'33%'}}>
+                <div className="text-center text-xs font-bold uppercase text-red-400 mb-1.5">GK</div>
+                <div className="space-y-1.5">{grouped.GK.map(p=><Bubble key={p.idx} player={p} gk={true}/>)}</div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className={`px-3 pb-4 pt-2 flex-shrink-0 border-t ${th.border}`}>
+          <button onClick={onClose} className={`w-full py-3 rounded-xl text-sm font-semibold ${darkMode?'bg-gray-700 text-gray-300':'bg-gray-200 text-gray-700'}`}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════ MAIN APP ═════════════════════════════════ */
+const SoccerStatsApp=()=>{
+  const [screen,setScreen]=useState('home');
+  const [games,setGames]=useState([]);
+  const [currentGame,setCurrentGame]=useState(null);
+  const [currentHalf,setCurrentHalf]=useState(1);
+  const [gameLog,setGameLog]=useState([]);
+  const [lastStat,setLastStat]=useState(null);
+  const [darkMode,setDarkMode]=useState(false);
+  const [onFieldSet,setOnFieldSet]=useState(new Set());
+  const [filterHalf,setFilterHalf]=useState('Total');
+  const [isEndGameView,setIsEndGameView]=useState(false);
+  const [shotPopup,setShotPopup]=useState(null);
+  const [viewShotChart,setViewShotChart]=useState(null);
+  const [shotSrc,setShotSrc]=useState('boxScore');
+  const [subModal,setSubModal]=useState(null);
+  const [showEndConfirm,setShowEndConfirm]=useState(false);
+  const [showMenuConfirm,setShowMenuConfirm]=useState(false);
+  const [boxBackScreen,setBoxBackScreen]=useState('home');
+  // New: possession-based two-screen flow
+  const [gameScreen,setGameScreen]=useState(1); // 1=possession start, 2=player in possession
+  const [possPlayer,setPossPlayer]=useState(null); // {idx,name,number,position}
+  const [pickerConfig,setPickerConfig]=useState(null); // {title,onPick,showUnknown?}
+  const [reassignEntry,setReassignEntry]=useState(null); // {idx} → game log entry to reassign
+
+  useEffect(()=>{
+    (async()=>{
+      try{const r=await storage.list('soccer:game:');if(r?.keys){const loaded=await Promise.all(r.keys.map(async k=>{const d=await storage.get(k);return d?JSON.parse(d.value):null;}));setGames(loaded.filter(Boolean));}}catch(e){}
+      try{const r=await storage.get('soccer:dark');if(r)setDarkMode(JSON.parse(r.value));}catch(e){}
+    })();
+  },[]);
+
+  const saveDark=async(v)=>{setDarkMode(v);try{await storage.set('soccer:dark',JSON.stringify(v));}catch(e){}};
+  const saveGame=async(g)=>await storage.set(`soccer:game:${g.id}`,JSON.stringify(g));
+  const deleteGame=async(id,idx)=>{await storage.delete(`soccer:game:${id}`);setGames(g=>idx!==undefined?g.filter((_,i)=>i!==idx):g.filter(x=>x.id!==id));};
+  const teamGoals=(g)=>g?g.players.reduce((t,p)=>t+(p.stats?.Gol||0),0):0;
+  const oppGoals=(g)=>g?(g.opponent.stats?.Gol||0):0;
+
+  const th={
+    bg:darkMode?'bg-gray-900':'bg-gray-100',
+    card:darkMode?'bg-gray-800':'bg-white',
+    text:darkMode?'text-white':'text-gray-900',
+    muted:darkMode?'text-gray-400':'text-gray-500',
+    border:darkMode?'border-gray-700':'border-gray-200',
+    input:darkMode?'bg-gray-700 text-white border-gray-600':'bg-white text-gray-900 border-gray-300',
+  };
+
+  /* ── helpers ─────────────────────────────────────────────────────────────── */
+  const pName=(idx)=>{
+    if(idx===null||idx===undefined)return'';
+    if(typeof idx==='string'&&idx.startsWith('unknown'))return idx.replace('unknown-','Unknown ');
+    if(idx==='opponent')return currentGame?.opponentName||'Opponent';
+    const p=currentGame?.players[idx];
+    return p?`#${p.number} ${p.name}`:'?';
+  };
+
+  const backToScreen1=()=>{setGameScreen(1);setPossPlayer(null);};
+
+  const goToScreen2=(playerIdx)=>{
+    const isUnk=typeof playerIdx==='string'&&playerIdx.startsWith('unknown');
+    const p=isUnk
+      ?{idx:playerIdx,name:`Unknown ${playerIdx.split('-')[1]}`,number:'?',position:playerIdx.split('-')[1]}
+      :{idx:playerIdx,number:currentGame.players[playerIdx]?.number||'?',name:currentGame.players[playerIdx]?.name||'Player',position:currentGame.players[playerIdx]?.position||''};
+    setPossPlayer(p);setGameScreen(2);setPickerConfig(null);
+  };
+
+  const openPicker=(config)=>setPickerConfig(config);
+
+  /* ── record stat ─────────────────────────────────────────────────────────── */
+  const recordStat=(playerIndex,statType,gameOverride=null,overrideText=null)=>{
+    if(!statType)return;
+    const upd=gameOverride?{...gameOverride}:{...currentGame};
+    const isOpp=playerIndex==='opponent';
+    const isUnk=typeof playerIndex==='string'&&playerIndex.startsWith('unknown');
+    if(!isUnk&&!isOpp&&typeof playerIndex==='number'){
+      const t=upd.players[playerIndex];
+      if(t){t.stats[statType]=(t.stats[statType]||0)+1;if(!t.periodStats[currentHalf])t.periodStats[currentHalf]={};t.periodStats[currentHalf][statType]=(t.periodStats[currentHalf][statType]||0)+1;}
+    }else if(isOpp){
+      upd.opponent.stats[statType]=(upd.opponent.stats[statType]||0)+1;if(!upd.opponent.periodStats[currentHalf])upd.opponent.periodStats[currentHalf]={};upd.opponent.periodStats[currentHalf][statType]=(upd.opponent.periodStats[currentHalf][statType]||0)+1;
+    }
+    if(currentHalf>upd.maxHalf)upd.maxHalf=currentHalf;
+    const name=pName(playerIndex)||upd.opponentName||'?';
+    let text=overrideText||`${name} — ${STAT_LABEL[statType]||statType}`;
+    if(statType==='Gol'){const tg=upd.players.reduce((t,p)=>t+(p.stats?.Gol||0),0);const og=upd.opponent.stats?.Gol||0;text=overrideText||`${name} — ⚽ GOAL! | ${upd.teamName} ${tg}–${og} ${upd.opponentName||'Opp'}`;}
+    const entry={time:Date.now(),half:currentHalf,playerIndex,statType,text,isUnknown:isUnk};
+    setGameLog(prev=>[entry,...prev]);setLastStat({text});setCurrentGame(upd);
+  };
+
+  /* ── log event (no stat) ─────────────────────────────────────────────────── */
+  const logEvent=(text,playerIndex=null)=>{
+    const entry={time:Date.now(),half:currentHalf,playerIndex,statType:'event',text};
+    setGameLog(prev=>[entry,...prev]);setLastStat({text});
+  };
+
+  /* ── shot popup ─────────────────────────────────────────────────────────── */
+  const openShot=(playerIdx,statType)=>setShotPopup({playerIndex:playerIdx,statType,x:null,y:null});
+  const handlePitchClick=(e)=>{const r=e.currentTarget.getBoundingClientRect();setShotPopup(prev=>({...prev,x:((e.clientX-r.left)/r.width)*100,y:((e.clientY-r.top)/r.height)*100}));};
+  const confirmShot=()=>{
+    const{playerIndex,statType,x,y}=shotPopup;
+    const isOpp=playerIndex==='opponent';
+    const isUnk=typeof playerIndex==='string'&&playerIndex.startsWith('unknown');
+    const upd={...currentGame};
+    if(isOpp)upd.opponent.shotChart=[...(upd.opponent.shotChart||[]),{x:x??50,y:y??50,type:statType,half:currentHalf,time:Date.now()}];
+    else if(!isUnk&&typeof playerIndex==='number')upd.players[playerIndex].shotChart=[...(upd.players[playerIndex].shotChart||[]),{x:x??50,y:y??50,type:statType,half:currentHalf,time:Date.now()}];
+    setShotPopup(null);
+    recordStat(playerIndex,statType,upd);
+    if(!isOpp)backToScreen1();
+  };
+
+  /* ── undo ───────────────────────────────────────────────────────────────── */
+  const undoLast=()=>{
+    if(!gameLog.length)return;
+    const last=gameLog[0];
+    if(last.statType==='endHalf'){setCurrentHalf(last.half);setGameLog(gameLog.slice(1));return;}
+    if(['Sub','event'].includes(last.statType)){setGameLog(gameLog.slice(1));setLastStat(gameLog.length>1?{text:gameLog[1].text}:null);return;}
+    if(last.isUnknown){const nl=gameLog.slice(1);setGameLog(nl);setLastStat(nl.length>0?{text:nl[0].text}:null);return;}
+    const upd={...currentGame};
+    const isOpp=last.playerIndex==='opponent';
+    if(isOpp){if((upd.opponent.stats?.[last.statType]||0)>0)upd.opponent.stats[last.statType]--;if((upd.opponent.periodStats?.[last.half]?.[last.statType]||0)>0)upd.opponent.periodStats[last.half][last.statType]--;if(['Gol','SoT','SoX'].includes(last.statType)&&upd.opponent.shotChart?.length>0)upd.opponent.shotChart=upd.opponent.shotChart.slice(0,-1);}
+    else if(typeof last.playerIndex==='number'){const t=upd.players[last.playerIndex];if(t){if((t.stats?.[last.statType]||0)>0)t.stats[last.statType]--;if((t.periodStats?.[last.half]?.[last.statType]||0)>0)t.periodStats[last.half][last.statType]--;if(['Gol','SoT','SoX'].includes(last.statType)&&t.shotChart?.length>0)t.shotChart=t.shotChart.slice(0,-1);}}
+    const nl=gameLog.slice(1);setGameLog(nl);setCurrentGame(upd);setLastStat(nl.length>0?{text:nl[0].text}:null);
+  };
+
+  /* ── half / game end ────────────────────────────────────────────────────── */
+  const endHalf=()=>{
+    if(currentHalf>=(currentGame.numHalves||2))return;
+    const text=`── End of Half ${currentHalf} ──`;
+    setGameLog(prev=>[{time:Date.now(),half:currentHalf,playerIndex:null,statType:'endHalf',text},...prev]);
+    setLastStat({text});setCurrentHalf(h=>h+1);backToScreen1();
+  };
+  const endGame=async()=>{
+    const g={...currentGame,gameLog};await saveGame(g);setCurrentGame(g);
+    setGames(prev=>prev.some(x=>x.id===g.id)?prev.map(x=>x.id===g.id?g:x):[...prev,g]);
+    setIsEndGameView(true);setBoxBackScreen('home');setFilterHalf('Total');setScreen('boxScore');
+  };
+  const viewGame=(g)=>{setCurrentGame(g);setFilterHalf('Total');setIsEndGameView(true);setGameLog(g.gameLog||[]);setBoxBackScreen('viewGames');setScreen('boxScore');};
+
+  /* ── game setup ─────────────────────────────────────────────────────────── */
+  const startNewGame=(info)=>{
+    const g={id:Date.now(),teamName:info.teamName,opponentName:info.opponent,date:info.date,location:info.location,numHalves:info.numHalves||2,
+      players:info.players.map(p=>({...p,stats:EMPTY_STATS(),periodStats:{},shotChart:[]})),
+      opponent:{stats:{Gol:0,SoT:0,SoX:0,FC:0,YC:0,CK:0},periodStats:{},shotChart:[]},maxHalf:1};
+    setCurrentGame(g);setCurrentHalf(1);setGameLog([]);setLastStat(null);setIsEndGameView(false);setGameScreen(1);setPossPlayer(null);
+    setOnFieldSet(new Set(info.players.slice(0,Math.min(9,info.players.length)).map((_,i)=>i)));
+    setScreen('game');
+  };
+
+  /* ── sub modal ──────────────────────────────────────────────────────────── */
+  const openSub=()=>{const sel={};const pos={};currentGame.players.forEach((p,i)=>{sel[i]=onFieldSet.has(i);pos[i]=p.position||'';});setSubModal({sel,pos,error:''});};
+  const confirmSub=()=>{
+    const on=Object.keys(subModal.sel).map(Number).filter(i=>subModal.sel[i]);
+    if(on.length>9){setSubModal(p=>({...p,error:`Max 9 players (${on.length} selected)`}));return;}
+    setOnFieldSet(new Set(on));
+    const upd={...currentGame};
+    upd.players=upd.players.map((p,i)=>({...p,position:subModal.pos[i]??p.position}));
+    setCurrentGame(upd);
+    setGameLog(prev=>[{time:Date.now(),half:currentHalf,playerIndex:-1,statType:'Sub',text:`Sub — ${on.length} on field`},...prev]);
+    setSubModal(null);
+  };
+
+  /* ── reassign unknown log entry ─────────────────────────────────────────── */
+  const reassignLogEntry=(entryIdx,newPlayerIdx)=>{
+    if(typeof newPlayerIdx!=='number')return;
+    const entry=gameLog[entryIdx];const player=currentGame.players[newPlayerIdx];if(!player)return;
+    const nl=[...gameLog];
+    const oldName=entry.playerIndex?.replace('unknown-','Unknown ');
+    const newName=`#${player.number} ${player.name}`;
+    nl[entryIdx]={...entry,playerIndex:newPlayerIdx,isUnknown:false,text:entry.text.replace(oldName,newName)};
+    const trackable=['Gol','SoT','SoX','Cmp','Inc','LOP','Drb','Int','Tkl','ChalB','Clr','FC','FW','YC','Sav'];
+    if(entry.statType&&trackable.includes(entry.statType)){
+      const upd={...currentGame};
+      upd.players[newPlayerIdx].stats[entry.statType]=(upd.players[newPlayerIdx].stats[entry.statType]||0)+1;
+      if(!upd.players[newPlayerIdx].periodStats[entry.half])upd.players[newPlayerIdx].periodStats[entry.half]={};
+      upd.players[newPlayerIdx].periodStats[entry.half][entry.statType]=(upd.players[newPlayerIdx].periodStats[entry.half][entry.statType]||0)+1;
+      setCurrentGame(upd);
+    }
+    setGameLog(nl);setReassignEntry(null);
+  };
+
+  /* ═══════════════════════════ HOME ════════════════════════════════════════ */
+  if(screen==='home')return(
+    <div className={`min-h-screen ${darkMode?'bg-gray-900':'bg-gradient-to-b from-green-600 to-green-800'} flex items-center justify-center p-4`}>
+      <div className="absolute top-4 right-4"><button onClick={()=>saveDark(!darkMode)} className={`p-3 rounded-full ${th.card}`}>{darkMode?<Sun size={24} className="text-yellow-400"/>:<Moon size={24} className="text-gray-700"/>}</button></div>
+      <div className="text-center w-full max-w-xs">
+        <div className="text-6xl mb-4">⚽</div>
+        <h1 className="text-4xl sm:text-5xl font-bold text-white mb-8">Soccer Stats</h1>
+        <div className="space-y-4">
+          <button onClick={()=>setScreen('setup')} className={`w-full ${darkMode?'bg-green-600 text-white':'bg-white text-green-700'} px-8 py-4 rounded-xl text-xl font-bold flex items-center justify-center gap-2`}><Plus size={24}/> New Game</button>
+          <button onClick={()=>setScreen('viewGames')} className={`w-full ${darkMode?'bg-gray-700':'bg-green-900'} text-white px-8 py-4 rounded-xl text-xl font-bold flex items-center justify-center gap-2`}><Eye size={24}/> Previous Games</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(screen==='setup')return <GameSetup onStart={startNewGame} onBack={()=>setScreen('home')} games={games} darkMode={darkMode} th={th}/>;
+
+  /* ═══════════════════════════ VIEW GAMES ══════════════════════════════════ */
+  if(screen==='viewGames')return(
+    <div className={`min-h-screen ${th.bg} ${th.text} p-4 max-w-3xl mx-auto`}>
+      <button onClick={()=>setScreen('home')} className="mb-4 flex items-center gap-2 text-green-500"><ArrowLeft size={20}/> Back</button>
+      <h2 className="text-2xl font-bold mb-4">Previous Games</h2>
+      {games.length===0?(<div className={`${th.card} rounded-xl p-8 text-center ${th.muted}`}>No games recorded yet.</div>):(
+        <div className="space-y-3">{[...games].reverse().map((g,ri)=>{
+          const idx=games.length-1-ri;const tg=g.players.reduce((t,p)=>t+(p.stats?.Gol||0),0);const og=g.opponent.stats?.Gol||0;
+          const result=tg>og?'W':tg<og?'L':'D';const rc=result==='W'?'text-green-400':result==='L'?'text-red-400':'text-yellow-400';
+          return(<div key={g.id} className={`${th.card} rounded-xl p-4 shadow flex items-center justify-between gap-3`}>
+            <div className="min-w-0"><div className="font-bold text-base">{g.teamName} <span className={`font-black ${rc}`}>{tg}–{og}</span> {g.opponentName||'Opponent'}</div>
+            <div className={`text-sm ${th.muted}`}>{g.date}{g.location?` • ${g.location}`:''}</div></div>
+            <div className="flex gap-2 flex-shrink-0"><button onClick={()=>viewGame(g)} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm">View</button>
+            <button onClick={()=>{if(window.confirm('Delete this game?'))deleteGame(g.id,idx);}} className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm">Del</button></div>
+          </div>);
+        })}</div>
+      )}
+    </div>
+  );
+
+  if(screen==='boxScore')return(<BoxScore game={currentGame} filterHalf={filterHalf} setFilterHalf={setFilterHalf} darkMode={darkMode} th={th} isEndGameView={isEndGameView} onBack={()=>{if(isEndGameView){setScreen(boxBackScreen);setIsEndGameView(false);}else setScreen('game');}} onStatEntry={()=>setScreen('game')} onMainMenu={()=>{setScreen('home');setIsEndGameView(false);}} onViewShotChart={(idx)=>{setViewShotChart(idx);setShotSrc('boxScore');setScreen('shotChart');}}/>);
+  if(screen==='shotChart')return(<ShotChartView game={currentGame} playerIndex={viewShotChart} darkMode={darkMode} th={th} onBack={()=>setScreen(shotSrc)}/>);
+
+  /* ═══════════════════════════ GAME LOG ════════════════════════════════════ */
+  if(screen==='gameLog')return(
+    <div className={`min-h-screen ${th.bg} ${th.text} p-4 max-w-2xl mx-auto`}>
+      <button onClick={()=>setScreen('game')} className="mb-4 flex items-center gap-2 text-green-500"><ArrowLeft size={20}/> Back</button>
+      <h2 className="text-xl font-bold mb-4">Game Log</h2>
+      {gameLog.length===0?(<div className={`${th.card} rounded-xl p-8 text-center ${th.muted}`}>No entries yet.</div>):(
+        <div className={`${th.card} rounded-xl shadow divide-y ${th.border}`}>
+          {gameLog.map((e,i)=>(
+            <div key={i} className={`p-3 text-sm flex gap-2 items-start ${e.statType==='endHalf'?(darkMode?'bg-orange-900/30':'bg-orange-50'):''} ${e.statType==='Gol'?(darkMode?'bg-green-900/30':'bg-green-50'):''}`}>
+              <span className={`text-xs ${th.muted} flex-shrink-0 mt-0.5`}>H{e.half||'–'}</span>
+              <div className="flex-1">
+                <span className={e.statType==='endHalf'?'font-bold text-orange-500':e.statType==='Gol'?'font-bold text-green-500':e.statType==='YC'?'font-semibold text-yellow-500':''}>{e.text}</span>
+                {e.isUnknown&&(
+                  <button onClick={()=>setReassignEntry({idx:i})} className="ml-2 text-xs text-yellow-400 underline font-medium">Change Player</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {reassignEntry&&currentGame&&(
+        <PlayerPickerModal title="Assign to player:" players={currentGame.players} onFieldSet={onFieldSet}
+          showUnknown={false} onPick={(idx)=>reassignLogEntry(reassignEntry.idx,idx)}
+          onClose={()=>setReassignEntry(null)} darkMode={darkMode} th={th}/>
+      )}
+    </div>
+  );
+
+  /* ═══════════════════════════ GAME SCREEN ══════════════════════════════════ */
+  if(screen==='game'){
+    const tg=teamGoals(currentGame);const og=oppGoals(currentGame);
+    const SBtn=({label,onClick,cls,tSize='text-sm'})=>(
+      <button onClick={onClick} className={`${cls} text-white ${tSize} font-semibold rounded-xl py-3 px-1.5 w-full active:opacity-70 leading-tight`} style={{minHeight:'48px'}}>{label}</button>
+    );
+    const Sect=({title,children})=>(
+      <div className="mb-3">
+        {title&&<div className={`text-xs font-bold uppercase tracking-wider mb-2 ${th.muted}`}>{title}</div>}
+        {children}
+      </div>
+    );
+
+    // GK auto-find for Save
+    const handleSaveGK=()=>{
+      const gkIdx=currentGame.players.findIndex(p=>p.position==='GK');
+      if(gkIdx>=0)recordStat(gkIdx,'Sav');
+      else openPicker({title:'Save — which GK?',showUnknown:false,onPick:(idx)=>{recordStat(idx,'Sav');setPickerConfig(null);}});
+    };
+
+    // Dead ball: log event, go to Screen 2
+    const handleDeadBall=(type)=>openPicker({
+      title:`${type} — who takes it?`,
+      onPick:(idx)=>{logEvent(`${pName(idx)} — ${type}`,idx);goToScreen2(idx);}
+    });
+
+    // Screen 1 picker action: pick player → record stat → go to screen (1 or 2)
+    const s1Pick=(title,stat,toScreen2)=>openPicker({
+      title,
+      onPick:(idx)=>{recordStat(idx,stat);setPickerConfig(null);if(toScreen2)goToScreen2(idx);}
+    });
+
+    // Screen 2 poss player shorthand
+    const pp=possPlayer;
+    const ppName=pp?(typeof pp.idx==='string'?pp.name:`#${pp.number} ${pp.name}`):'';
+
+    return(
+      <div className={`min-h-screen ${th.bg} ${th.text} pb-8`}>
+        <div className="max-w-2xl mx-auto px-3 pt-3">
+
+          {/* Nav */}
+          <div className="flex flex-wrap gap-1.5 mb-3 items-center">
+            {showMenuConfirm?(
+              <div className="flex gap-2 items-center">
+                <span className="text-sm font-medium">Go to menu?</span>
+                <button onClick={()=>{setShowMenuConfirm(false);setScreen('home');setIsEndGameView(false);}} className="bg-gray-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold">Yes</button>
+                <button onClick={()=>setShowMenuConfirm(false)} className="bg-gray-500 text-white px-3 py-1.5 rounded-lg text-sm">No</button>
+              </div>
+            ):(
+              <button onClick={()=>setShowMenuConfirm(true)} className={`p-2 rounded-full ${th.card} text-lg`}>🏠</button>
+            )}
+            <button onClick={()=>{setBoxBackScreen('game');setScreen('boxScore');}} className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm">Box Score</button>
+            <button onClick={()=>{setViewShotChart('team');setShotSrc('game');setScreen('shotChart');}} className="bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm">Shot Chart</button>
+            <button onClick={()=>setScreen('gameLog')} className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm">Game Log</button>
+            <button onClick={openSub} className="bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm">Subs</button>
+            <div className="ml-auto"><button onClick={()=>saveDark(!darkMode)} className={`p-2 rounded-full ${th.card}`}>{darkMode?<Sun size={20}/>:<Moon size={20}/>}</button></div>
+          </div>
+
+          {/* Scoreboard */}
+          <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-2xl shadow-lg p-3 sm:p-4 mb-3 text-white">
+            <div className="flex justify-between items-center">
+              <div className="text-center flex-1 min-w-0 px-1"><div className="text-xs sm:text-sm opacity-90 font-semibold truncate">{currentGame.teamName}</div><div className="text-4xl sm:text-5xl font-black">{tg}</div></div>
+              <div className="text-center px-2 flex-shrink-0"><div className="text-sm font-semibold opacity-80">vs</div><div className="text-xs opacity-70">Half {currentHalf}</div></div>
+              <div className="text-center flex-1 min-w-0 px-1"><div className="text-xs sm:text-sm opacity-90 font-semibold truncate">{currentGame.opponentName||'Opponent'}</div><div className="text-4xl sm:text-5xl font-black">{og}</div></div>
+            </div>
+          </div>
+
+          {/* Last stat + controls */}
+          {lastStat&&<div className={`${th.card} rounded-xl px-3 py-2 mb-2 text-sm text-green-500 font-medium truncate`}>↳ {lastStat.text}</div>}
+          <div className="flex gap-2 mb-3 flex-wrap">
+            <button onClick={undoLast} disabled={!gameLog.length} className="flex items-center gap-1 bg-yellow-600 disabled:opacity-40 text-white px-3 py-2 rounded-xl text-sm font-medium"><Undo size={14}/> Undo</button>
+            <div className="flex-1"/>
+            <button onClick={endHalf} disabled={currentHalf>=(currentGame.numHalves||2)} className="bg-orange-600 disabled:opacity-40 text-white px-3 py-2 rounded-xl text-sm">End Half {currentHalf}</button>
+            {showEndConfirm?(
+              <div className="flex gap-1.5 items-center">
+                <span className="text-sm font-medium">End?</span>
+                <button onClick={()=>{setShowEndConfirm(false);endGame();}} className="bg-red-700 text-white px-3 py-2 rounded-xl font-bold text-sm">Yes</button>
+                <button onClick={()=>setShowEndConfirm(false)} className="bg-gray-500 text-white px-3 py-2 rounded-xl text-sm">No</button>
+              </div>
+            ):(
+              <button onClick={()=>setShowEndConfirm(true)} className="bg-red-600 text-white px-3 py-2 rounded-xl text-sm">End Game</button>
+            )}
+          </div>
+
+          {/* ═══ SCREEN 1: Possession Start ═══ */}
+          {gameScreen===1&&(
+            <div>
+              <div className={`text-center text-xs font-bold uppercase tracking-widest mb-3 py-1 rounded-lg ${darkMode?'bg-gray-700 text-gray-300':'bg-gray-200 text-gray-500'}`}>Screen 1 — Possession Start</div>
+
+              <Sect title="Dead Ball">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  <SBtn label="Goal Kick" onClick={()=>handleDeadBall('Goal Kick')} cls="bg-blue-700" tSize="text-xs"/>
+                  <SBtn label="Free Kick" onClick={()=>handleDeadBall('Free Kick')} cls="bg-blue-600" tSize="text-xs"/>
+                  <SBtn label="Start Half" onClick={()=>handleDeadBall('Start Half')} cls="bg-blue-500" tSize="text-xs"/>
+                  <SBtn label="Corner" onClick={()=>handleDeadBall('Corner')} cls="bg-blue-400" tSize="text-xs"/>
+                  <SBtn label="Throw In" onClick={()=>handleDeadBall('Throw In')} cls="bg-blue-300" tSize="text-xs"/>
+                </div>
+              </Sect>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <SBtn label="Loose Ball" onClick={()=>openPicker({title:'Loose Ball — who took possession?',onPick:(idx)=>{logEvent(`${pName(idx)} — Loose Ball → Possession`,idx);goToScreen2(idx);}})} cls="bg-slate-500" tSize="text-xs"/>
+                <SBtn label="Foul Conceded" onClick={()=>s1Pick('Foul Conceded — who?','FC',false)} cls="bg-rose-600" tSize="text-xs"/>
+                <SBtn label="Foul Won" onClick={()=>s1Pick('Foul Won — who?','FW',false)} cls="bg-pink-500" tSize="text-xs"/>
+              </div>
+
+              <Sect title="Defense">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                  <SBtn label="Intercept: Won → Possession" onClick={()=>s1Pick('Interception — who?','Int',true)} cls="bg-teal-600" tSize="text-xs"/>
+                  <SBtn label="Intercept: Won → Loose Ball" onClick={()=>s1Pick('Interception — who?','Int',false)} cls="bg-teal-700" tSize="text-xs"/>
+                  <SBtn label="Save (GK)" onClick={handleSaveGK} cls="bg-purple-600" tSize="text-xs"/>
+                  <SBtn label="Challenge: Won" onClick={()=>s1Pick('Challenge Won — who?','Tkl',true)} cls="bg-emerald-600" tSize="text-xs"/>
+                  <SBtn label="Challenge: Loose Ball" onClick={()=>s1Pick('Challenge — who?','Tkl',false)} cls="bg-emerald-700" tSize="text-xs"/>
+                  <SBtn label="Challenge: Beat" onClick={()=>s1Pick('Challenge — who got beat?','ChalB',false)} cls="bg-orange-600" tSize="text-xs"/>
+                </div>
+              </Sect>
+
+              <Sect title="Opposition">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <SBtn label="Opp: ⚽ Goal" onClick={()=>recordStat('opponent','Gol')} cls="bg-green-800" tSize="text-xs"/>
+                  <SBtn label="Opp: Shot On Target" onClick={()=>recordStat('opponent','SoT')} cls="bg-orange-500" tSize="text-xs"/>
+                  <SBtn label="Opp: Shot Off Target" onClick={()=>recordStat('opponent','SoX')} cls="bg-red-600" tSize="text-xs"/>
+                  <SBtn label="Opp: Save (GK)" onClick={()=>recordStat('opponent','Sav')} cls="bg-purple-700" tSize="text-xs"/>
+                  <SBtn label="Opp: Turnover" onClick={()=>logEvent(`${currentGame.opponentName||'Opponent'} — Turnover`)} cls="bg-slate-500" tSize="text-xs"/>
+                  <SBtn label="Opp: Yellow Card" onClick={()=>recordStat('opponent','YC')} cls="bg-yellow-500" tSize="text-xs"/>
+                  <SBtn label="Opp: Free Kick" onClick={()=>logEvent(`${currentGame.opponentName||'Opponent'} — Free Kick`)} cls="bg-blue-600" tSize="text-xs"/>
+                  <SBtn label="Opp: Corner" onClick={()=>logEvent(`${currentGame.opponentName||'Opponent'} — Corner`)} cls="bg-blue-500" tSize="text-xs"/>
+                  <SBtn label="Opp: Throw In" onClick={()=>logEvent(`${currentGame.opponentName||'Opponent'} — Throw In`)} cls="bg-blue-400" tSize="text-xs"/>
+                </div>
+              </Sect>
+            </div>
+          )}
+
+          {/* ═══ SCREEN 2: Player in Possession ═══ */}
+          {gameScreen===2&&(
+            <div>
+              {/* Possession banner */}
+              <div className="bg-gradient-to-r from-emerald-700 to-green-600 rounded-2xl p-3 mb-3 text-white text-center shadow-lg">
+                <div className="text-xs opacity-80 font-medium uppercase tracking-wide">In Possession</div>
+                <div className="text-xl sm:text-2xl font-black mt-0.5">{ppName}</div>
+                {pp?.position&&<div className="text-xs opacity-70 mt-0.5">{pp.position}</div>}
+              </div>
+              <div className="text-center text-xs font-bold uppercase tracking-widest mb-3 py-1 rounded-lg bg-emerald-900/40 text-emerald-400">Screen 2 — In Possession</div>
+
+              <Sect title="Pass">
+                <div className="grid grid-cols-3 gap-2">
+                  <SBtn label="Complete" tSize="text-xs" cls="bg-sky-600" onClick={()=>openPicker({title:'Pass to:',onPick:(idx)=>{recordStat(pp.idx,'Cmp',null,`${ppName} — Pass Complete → ${pName(idx)}`);goToScreen2(idx);}})}/>
+                  <SBtn label="Loose Ball" tSize="text-xs" cls="bg-sky-800" onClick={()=>{recordStat(pp.idx,'Inc',null,`${ppName} — Pass — Loose Ball`);backToScreen1();}}/>
+                  <SBtn label="Turnover" tSize="text-xs" cls="bg-slate-600" onClick={()=>{recordStat(pp.idx,'LOP',null,`${ppName} — Pass — Turnover`);backToScreen1();}}/>
+                </div>
+              </Sect>
+
+              <Sect title="Dribble">
+                <div className="grid grid-cols-3 gap-2">
+                  <SBtn label="Beat Opponent" tSize="text-xs" cls="bg-violet-600" onClick={()=>recordStat(pp.idx,'Drb',null,`${ppName} — Dribble — Beat Opponent`)}/>
+                  <SBtn label="Space" tSize="text-xs" cls="bg-violet-500" onClick={()=>recordStat(pp.idx,'Drb',null,`${ppName} — Dribble — Space`)}/>
+                  <SBtn label="Turnover" tSize="text-xs" cls="bg-slate-600" onClick={()=>{recordStat(pp.idx,'LOP',null,`${ppName} — Dribble — Turnover`);backToScreen1();}}/>
+                </div>
+              </Sect>
+
+              <Sect title="Clearance">
+                <div className="grid grid-cols-2 gap-2">
+                  <SBtn label="Good" cls="bg-teal-600" onClick={()=>{recordStat(pp.idx,'Clr',null,`${ppName} — Clearance — Good`);backToScreen1();}}/>
+                  <SBtn label="Bad" cls="bg-teal-800" onClick={()=>{recordStat(pp.idx,'Clr',null,`${ppName} — Clearance — Bad`);backToScreen1();}}/>
+                </div>
+              </Sect>
+
+              <Sect title="Shot">
+                <div className="grid grid-cols-3 gap-2">
+                  <SBtn label="⚽ Goal" cls="bg-green-600" tSize="text-xs" onClick={()=>openShot(pp.idx,'Gol')}/>
+                  <SBtn label="On Target" cls="bg-orange-500" tSize="text-xs" onClick={()=>openShot(pp.idx,'SoT')}/>
+                  <SBtn label="Off Target" cls="bg-red-500" tSize="text-xs" onClick={()=>openShot(pp.idx,'SoX')}/>
+                </div>
+              </Sect>
+
+              <button onClick={backToScreen1} className={`w-full py-2.5 rounded-xl text-sm font-medium mt-1 ${darkMode?'bg-gray-700 text-gray-300':'bg-gray-200 text-gray-600'}`}>← Back to Possession Start</button>
+            </div>
+          )}
+        </div>
+
+        {/* Player Picker Modal */}
+        {pickerConfig&&currentGame&&(
+          <PlayerPickerModal
+            title={pickerConfig.title}
+            players={currentGame.players}
+            onFieldSet={onFieldSet}
+            showUnknown={pickerConfig.showUnknown!==false}
+            onPick={pickerConfig.onPick}
+            onClose={()=>setPickerConfig(null)}
+            darkMode={darkMode} th={th}
+          />
+        )}
+
+        {/* Shot location popup */}
+        {shotPopup&&(
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className={`${th.card} ${th.text} rounded-2xl p-4 w-full max-w-sm`}>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-bold">{shotPopup.statType==='Gol'?'⚽ Goal':shotPopup.statType==='SoT'?'🟡 Shot On Target':'❌ Shot Off Target'}</h3>
+                <button onClick={()=>setShotPopup(null)} className="p-1"><X size={20}/></button>
+              </div>
+              <p className={`text-xs ${th.muted} mb-2 text-center`}>Tap where the shot was taken from (or skip)</p>
+              <div className="relative rounded-xl overflow-hidden">
+                <PitchSVG onClick={handlePitchClick} cursor="crosshair">
+                  {shotPopup.x!==null&&<circle cx={shotPopup.x} cy={shotPopup.y*0.8} r="3" fill={shotPopup.statType==='Gol'?'#22c55e':shotPopup.statType==='SoT'?'#f59e0b':'#ef4444'} stroke="white" strokeWidth="0.6" opacity="0.95"/>}
+                </PitchSVG>
+                <div className="absolute bottom-1 left-0 right-0 text-center text-xs text-white/70">↑ attacking direction</div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={()=>setShotPopup(null)} className={`flex-1 py-2.5 rounded-xl text-sm ${darkMode?'bg-gray-700':'bg-gray-200'}`}>Cancel</button>
+                <button onClick={confirmShot} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl font-bold text-sm">{shotPopup.x===null?'Record (no location)':'Confirm ✓'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sub modal */}
+        {subModal&&(
+          <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50">
+            <div className={`${th.card} ${th.text} w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 flex flex-col`} style={{maxHeight:'80vh'}}>
+              <div className="flex justify-between items-center mb-3 flex-shrink-0">
+                <h3 className="text-lg font-bold">Players On Field</h3>
+                <button onClick={()=>setSubModal(null)} className="p-1"><X size={22}/></button>
+              </div>
+              <p className={`text-sm ${th.muted} mb-3 flex-shrink-0`}>Toggle players on the field (9 max).</p>
+              <div className="flex-1 overflow-y-auto space-y-2 mb-3">
+                {currentGame.players.map((p,i)=>{const on=subModal.sel[i];return(
+                  <div key={i} className={`flex items-center justify-between gap-2 p-3 rounded-xl border cursor-pointer ${th.border} ${on?(darkMode?'bg-green-900/40':'bg-green-50'):''}`}
+                    onClick={()=>setSubModal(prev=>({...prev,sel:{...prev.sel,[i]:!prev.sel[i]},error:''}))}>
+                    <span className="font-medium text-sm flex-1 min-w-0">#{p.number} {p.name}</span>
+                    <select value={subModal.pos[i]||''} onClick={e=>e.stopPropagation()} onChange={e=>setSubModal(prev=>({...prev,pos:{...prev.pos,[i]:e.target.value}}))} className={`text-xs p-1.5 border rounded-lg flex-shrink-0 ${th.input}`} style={{width:'70px'}}>
+                      <option value="">Pos</option>
+                      {['GK','DEF','MID','FWD'].map(pos=><option key={pos} value={pos}>{pos}</option>)}
+                    </select>
+                    <div className={`w-12 h-6 rounded-full relative flex-shrink-0 ${on?'bg-green-600':'bg-gray-300'}`}><div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on?'translate-x-6':''}`}/></div>
+                  </div>
+                );})}
+              </div>
+              {subModal.error&&<p className="text-red-500 text-sm mb-2 flex-shrink-0">{subModal.error}</p>}
+              <p className={`text-sm ${th.muted} mb-3 flex-shrink-0`}>{Object.values(subModal.sel).filter(Boolean).length} of 9 selected</p>
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={()=>setSubModal(prev=>({...prev,sel:Object.fromEntries(currentGame.players.map((_,i)=>[i,false]))}))} className={`flex-1 py-2.5 rounded-xl text-sm ${darkMode?'bg-gray-700':'bg-gray-200'}`}>Clear All</button>
+                <button onClick={confirmSub} className="flex-1 bg-green-600 text-white font-bold py-2.5 rounded-xl">Confirm</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+};
+
+/* ═══════════════════════════ GAME SETUP ══════════════════════════════════ */
+const GameSetup=({onStart,onBack,games,darkMode,th})=>{
+  const [teamName,setTeamName]=useState('');
+  const [date,setDate]=useState(new Date().toISOString().split('T')[0]);
+  const [opponent,setOpponent]=useState('');
+  const [location,setLocation]=useState('');
+  const [numHalves,setNumHalves]=useState(2);
+  const [players,setPlayers]=useState(Array.from({length:11},()=>({number:'',name:'',position:''})));
+  const [importId,setImportId]=useState('');
+
+  const addPlayer=()=>setPlayers(p=>[...p,{number:'',name:'',position:''}]);
+  const updPlayer=(i,f,v)=>{const u=[...players];u[i][f]=v;setPlayers(u);};
+  const remPlayer=(i)=>{if(players.length>1)setPlayers(p=>p.filter((_,j)=>j!==i));};
+  const importPlayers=()=>{const g=games.find(g=>g.id===parseInt(importId));if(g)setPlayers(g.players.map(p=>({number:p.number,name:p.name,position:p.position||''})));};
+  const handleStart=()=>{
+    if(!teamName||!opponent)return;
+    const valid=players.filter(p=>p.number||p.name);if(!valid.length)return;
+    onStart({teamName,date,opponent,location,numHalves:parseInt(numHalves)||2,players:valid});
+  };
+  const inp=`w-full p-3 border rounded-xl ${th.input}`;
+  const POSITIONS=['GK','DEF','MID','FWD'];
+  return(
+    <div className={`min-h-screen ${th.bg} ${th.text} p-4 max-w-2xl mx-auto`}>
+      <button onClick={onBack} className="mb-4 flex items-center gap-2 text-green-500"><ArrowLeft size={20}/> Back</button>
+      <div className={`${th.card} rounded-2xl shadow-lg p-5 space-y-3`}>
+        <h2 className="text-2xl font-bold">New Game Setup</h2>
+        <input placeholder="Team Name *" value={teamName} onChange={e=>setTeamName(e.target.value)} className={inp}/>
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} className={inp}/>
+        <input placeholder="Opponent *" value={opponent} onChange={e=>setOpponent(e.target.value)} className={inp}/>
+        <input placeholder="Location / Venue" value={location} onChange={e=>setLocation(e.target.value)} className={inp}/>
+        <div><label className={`block text-xs font-medium mb-1 ${th.muted}`}>Number of Halves</label>
+        <input type="number" min="1" max="4" value={numHalves} onChange={e=>setNumHalves(e.target.value)} className={`w-28 p-3 border rounded-xl ${th.input}`}/></div>
+        {games.length>0&&(<div className="flex gap-2">
+          <select value={importId} onChange={e=>setImportId(e.target.value)} className={`flex-1 p-3 border rounded-xl ${th.input}`}>
+            <option value="">Import players from previous game…</option>
+            {games.map(g=><option key={g.id} value={g.id}>{g.teamName} vs {g.opponentName||'Opp'} ({g.date})</option>)}
+          </select>
+          <button onClick={importPlayers} className="bg-green-600 text-white px-4 py-2 rounded-xl">Import</button>
+        </div>)}
+        <div>
+          <h3 className="text-lg font-bold mb-2">Players <span className={`text-sm font-normal ${th.muted}`}>(9 on field incl. GK)</span></h3>
+          <div className="space-y-2">{players.map((p,i)=>(
+            <div key={i} className="flex gap-1.5">
+              <input placeholder="#" value={p.number} onChange={e=>updPlayer(i,'number',e.target.value)} className={`w-14 p-2 border rounded-xl ${th.input} text-sm`}/>
+              <input placeholder="Name" value={p.name} onChange={e=>updPlayer(i,'name',e.target.value)} className={`flex-1 p-2 border rounded-xl ${th.input} text-sm`}/>
+              <select value={p.position} onChange={e=>updPlayer(i,'position',e.target.value)} className={`w-20 p-2 border rounded-xl ${th.input} text-sm`}>
+                <option value="">Pos</option>
+                {POSITIONS.map(pos=><option key={pos} value={pos}>{pos}</option>)}
+              </select>
+              {players.length>1&&<button onClick={()=>remPlayer(i)} className="bg-red-500 text-white px-2 rounded-xl"><X size={15}/></button>}
+            </div>
+          ))}</div>
+          <button onClick={addPlayer} className={`w-full mt-2 ${darkMode?'bg-gray-700':'bg-gray-200'} px-4 py-2 rounded-xl text-sm`}>+ Add Player</button>
+        </div>
+        <button onClick={handleStart} disabled={!teamName||!opponent} className="w-full bg-green-600 text-white px-6 py-4 rounded-xl text-lg font-bold disabled:opacity-50">Start Game ⚽</button>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════ BOX SCORE ════════════════════════════════════ */
+const BoxScore=({game,onBack,filterHalf,setFilterHalf,darkMode,th,isEndGameView,onStatEntry,onMainMenu,onViewShotChart})=>{
+  const getStats=(e)=>filterHalf==='Total'?e.stats||{}:e.periodStats?.[parseInt(filterHalf)]||{};
+  const pct=(a,b)=>(a+b)===0?'—':`${Math.round(a/(a+b)*100)}%`;
+  const teamTot=()=>{const t={};game.players.forEach(p=>{const s=getStats(p);Object.keys(s).forEach(k=>{t[k]=(t[k]||0)+(s[k]||0);});});return t;};
+  const tot=teamTot();
+  const teamGoals=game.players.reduce((t,p)=>t+(p.stats?.Gol||0),0);
+  const oppGoals=game.opponent.stats?.Gol||0;
+  const oppStats=getStats(game.opponent);
+  const halves=[];for(let i=1;i<=(game.maxHalf||1);i++)halves.push(i);
+
+  const exportCSV=()=>{
+    const rows=[`${game.teamName} vs ${game.opponentName||'Opp'} — ${game.date}`,`Half: ${filterHalf}`,'','Name,Pos,#,G,SoT,SoX,SoT%,Cmp,Inc,P%,LOP,Drb,Int,Tkl,ChalB,Clr,FC,FW,YC,Sav'];
+    game.players.forEach(p=>{const s=getStats(p);const shots=(s.Gol||0)+(s.SoT||0)+(s.SoX||0);rows.push([`"${p.name}"`,p.position||'',p.number,s.Gol||0,s.SoT||0,s.SoX||0,shots>0?pct((s.Gol||0)+(s.SoT||0),s.SoX||0):'—',s.Cmp||0,s.Inc||0,pct(s.Cmp||0,s.Inc||0),s.LOP||0,s.Drb||0,s.Int||0,s.Tkl||0,s.ChalB||0,s.Clr||0,s.FC||0,s.FW||0,s.YC||0,s.Sav||0].join(','));});
+    const blob=new Blob([rows.join('\n')],{type:'text/csv'});const a=document.createElement('a');a.download=`${game.date}-${game.teamName}.csv`;a.href=URL.createObjectURL(blob);a.click();
+  };
+  const H='p-2 text-center text-xs font-semibold whitespace-nowrap';
+  const TD='p-2 text-center text-xs';
+  return(
+    <div className={`min-h-screen ${th.bg} ${th.text} p-3`}>
+      <div className="flex justify-between items-center mb-3">
+        <button onClick={onBack} className="flex items-center gap-2 text-green-500"><ArrowLeft size={20}/> Back</button>
+        <div className="flex gap-2">
+          <button onClick={exportCSV} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"><Download size={14}/> CSV</button>
+          {!isEndGameView&&onStatEntry&&<button onClick={onStatEntry} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">Entry</button>}
+          {onMainMenu&&<button onClick={onMainMenu} className={`${darkMode?'bg-gray-700':'bg-gray-600'} text-white px-3 py-2 rounded-lg text-sm`}>Menu</button>}
+        </div>
+      </div>
+      <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-xl p-4 mb-3 text-white text-center">
+        <div className="text-lg font-bold">{game.teamName} <span className="text-4xl font-black mx-2">{teamGoals}–{oppGoals}</span> {game.opponentName||'Opponent'}</div>
+        <div className="text-sm opacity-75">{game.date}{game.location?` • ${game.location}`:''}</div>
+      </div>
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {['Total',...halves.map(String)].map(h=>(<button key={h} onClick={()=>setFilterHalf(h)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filterHalf===h?'bg-green-600 text-white':(darkMode?'bg-gray-700 text-gray-300':'bg-gray-200 text-gray-700')}`}>{h==='Total'?'Total':`Half ${h}`}</button>))}
+        <button onClick={()=>onViewShotChart('team')} className="bg-teal-600 text-white px-3 py-1.5 rounded-lg text-sm ml-auto">Team Shots</button>
+        <button onClick={()=>onViewShotChart('opponent')} className="bg-yellow-600 text-white px-3 py-1.5 rounded-lg text-sm">Opp Shots</button>
+      </div>
+      <div className={`${th.card} rounded-xl shadow overflow-x-auto mb-3`}>
+        <table className="w-full min-w-max">
+          <thead><tr className={darkMode?'bg-gray-700 text-gray-200':'bg-green-700 text-white'}>
+            <th className="p-2 text-left text-xs font-semibold sticky left-0 bg-inherit">Player</th>
+            <th className={H}>G</th><th className={H}>SoT</th><th className={H}>SoX</th><th className={H}>SoT%</th>
+            <th className={H}>Cmp</th><th className={H}>Inc</th><th className={H}>P%</th><th className={H}>LOP</th>
+            <th className={H}>Drb</th><th className={H}>Int</th><th className={H}>Tkl</th><th className={H}>CB</th>
+            <th className={H}>Clr</th><th className={H}>FC</th><th className={H}>FW</th><th className={H}>YC</th><th className={H}>Sav</th>
+          </tr></thead>
+          <tbody>
+            {game.players.map((player,i)=>{
+              const s=getStats(player);const shots=(s.Gol||0)+(s.SoT||0)+(s.SoX||0);const passes=(s.Cmp||0)+(s.Inc||0);
+              const rowBg=i%2===1?(darkMode?'bg-gray-700/40':'bg-gray-50'):'';const hasShots=(player.shotChart||[]).length>0;
+              return(<tr key={i} className={`border-b ${th.border} ${rowBg}`}>
+                <td className={`p-2 text-xs font-medium sticky left-0 ${darkMode?'bg-gray-800':'bg-white'} ${rowBg}`}>
+                  <div className="font-semibold">#{player.number} {player.name}</div>
+                  {player.position&&<div className={`text-xs ${th.muted}`}>{player.position}</div>}
+                  {hasShots&&<button onClick={()=>onViewShotChart(i)} className="text-teal-500 text-xs underline">shots</button>}
+                </td>
+                <td className={`${TD} font-bold ${s.Gol>0?'text-green-500':''}`}>{s.Gol||0}</td>
+                <td className={TD}>{s.SoT||0}</td><td className={TD}>{s.SoX||0}</td>
+                <td className={`${TD} text-xs`}>{shots>0?pct((s.Gol||0)+(s.SoT||0),s.SoX||0):'—'}</td>
+                <td className={TD}>{s.Cmp||0}</td><td className={`${TD} ${s.Inc>0?'text-orange-400':''}`}>{s.Inc||0}</td>
+                <td className={`${TD} text-xs`}>{pct(s.Cmp||0,s.Inc||0)}</td>
+                <td className={`${TD} ${s.LOP>0?'text-red-400':''}`}>{s.LOP||0}</td>
+                <td className={TD}>{s.Drb||0}</td><td className={`${TD} ${s.Int>0?'text-teal-400':''}`}>{s.Int||0}</td>
+                <td className={`${TD} ${s.Tkl>0?'text-teal-400':''}`}>{s.Tkl||0}</td>
+                <td className={`${TD} ${s.ChalB>0?'text-orange-400':''}`}>{s.ChalB||0}</td>
+                <td className={TD}>{s.Clr||0}</td>
+                <td className={`${TD} ${s.FC>0?'text-rose-400':''}`}>{s.FC||0}</td>
+                <td className={TD}>{s.FW||0}</td>
+                <td className={`${TD} font-bold ${s.YC>0?'text-yellow-400':''}`}>{s.YC||0}</td>
+                <td className={`${TD} ${s.Sav>0?'text-purple-400':''}`}>{s.Sav||0}</td>
+              </tr>);
+            })}
+            <tr className={`border-t-2 ${darkMode?'border-gray-500 bg-green-900/40':'border-green-600 bg-green-50'} font-bold`}>
+              <td className={`p-2 text-xs font-bold sticky left-0 ${darkMode?'bg-green-900/40':'bg-green-50'}`}>TEAM</td>
+              <td className={`${TD} font-bold text-green-500`}>{tot.Gol||0}</td><td className={TD}>{tot.SoT||0}</td><td className={TD}>{tot.SoX||0}</td>
+              <td className={`${TD} text-xs`}>{((tot.Gol||0)+(tot.SoT||0)+(tot.SoX||0))>0?pct((tot.Gol||0)+(tot.SoT||0),tot.SoX||0):'—'}</td>
+              <td className={TD}>{tot.Cmp||0}</td><td className={TD}>{tot.Inc||0}</td><td className={`${TD} text-xs`}>{pct(tot.Cmp||0,tot.Inc||0)}</td>
+              <td className={TD}>{tot.LOP||0}</td><td className={TD}>{tot.Drb||0}</td><td className={TD}>{tot.Int||0}</td><td className={TD}>{tot.Tkl||0}</td>
+              <td className={TD}>{tot.ChalB||0}</td><td className={TD}>{tot.Clr||0}</td><td className={TD}>{tot.FC||0}</td><td className={TD}>{tot.FW||0}</td>
+              <td className={`${TD} ${tot.YC>0?'text-yellow-400':''}`}>{tot.YC||0}</td><td className={TD}>{tot.Sav||0}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className={`${th.card} rounded-xl shadow p-4`}>
+        <h3 className="font-bold mb-2">Opponent — {game.opponentName||'Opp'}</h3>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <span>⚽ {oppStats.Gol||0}</span><span>SoT: {oppStats.SoT||0}</span><span>SoX: {oppStats.SoX||0}</span>
+          {((oppStats.Gol||0)+(oppStats.SoT||0)+(oppStats.SoX||0))>0&&<span>SoT%: {pct((oppStats.Gol||0)+(oppStats.SoT||0),oppStats.SoX||0)}</span>}
+          <span>FC: {oppStats.FC||0}</span><span className={oppStats.YC?'text-yellow-400':''}>YC: {oppStats.YC||0}</span><span className={oppStats.Sav?'text-purple-400':''}>Sav: {oppStats.Sav||0}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════ SHOT CHART VIEW ══════════════════════════════ */
+const ShotChartView=({game,playerIndex,onBack,darkMode,th})=>{
+  const [filter,setFilter]=useState('all');const [halfFilter,setHalfFilter]=useState('all');
+  const getAllShots=()=>{
+    if(playerIndex==='team')return game.players.flatMap((p,i)=>(p.shotChart||[]).map(s=>({...s,playerName:`#${p.number} ${p.name}`,playerIdx:i})));
+    if(playerIndex==='opponent')return(game.opponent.shotChart||[]).map(s=>({...s,playerName:game.opponentName||'Opp',playerIdx:'opponent'}));
+    const p=game.players[playerIndex];return(p?.shotChart||[]).map(s=>({...s,playerName:`#${p.number} ${p.name}`,playerIdx:playerIndex}));
+  };
+  const shots=getAllShots().filter(s=>{if(filter!=='all'&&s.type!==filter)return false;if(halfFilter!=='all'&&String(s.half)!==halfFilter)return false;return true;});
+  const goals=shots.filter(s=>s.type==='Gol').length;const onTarget=shots.filter(s=>s.type==='SoT').length;const offTarget=shots.filter(s=>s.type==='SoX').length;
+  const halves=[];for(let i=1;i<=(game.maxHalf||1);i++)halves.push(i);
+  const title=playerIndex==='team'?'Team Shot Chart':playerIndex==='opponent'?`${game.opponentName||'Opp'} Shot Chart`:`#${game.players[playerIndex]?.number} ${game.players[playerIndex]?.name}`;
+  return(
+    <div className={`min-h-screen ${th.bg} ${th.text} p-4 max-w-lg mx-auto`}>
+      <button onClick={onBack} className="mb-4 flex items-center gap-2 text-green-500"><ArrowLeft size={20}/> Back</button>
+      <h2 className="text-xl font-bold mb-1">{title}</h2>
+      <p className={`text-sm ${th.muted} mb-3`}>{game.teamName} vs {game.opponentName||'Opp'} • {game.date}</p>
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <span className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-full font-bold">⚽ {goals}</span>
+        <span className="bg-orange-500 text-white text-xs px-3 py-1.5 rounded-full font-bold">🟡 {onTarget} Saved</span>
+        <span className="bg-red-500 text-white text-xs px-3 py-1.5 rounded-full font-bold">✕ {offTarget} Off</span>
+        {shots.length>0&&<span className={`${darkMode?'bg-gray-700':'bg-gray-200'} text-xs px-3 py-1.5 rounded-full`}>SoT: {Math.round((goals+onTarget)/Math.max(shots.length,1)*100)}%</span>}
+      </div>
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {[{v:'all',l:'All'},{v:'Gol',l:'Goals'},{v:'SoT',l:'Saved'},{v:'SoX',l:'Off Target'}].map(({v,l})=>(
+          <button key={v} onClick={()=>setFilter(v)} className={`px-3 py-1 rounded-lg text-xs font-medium ${filter===v?'bg-green-600 text-white':(darkMode?'bg-gray-700 text-gray-300':'bg-gray-200 text-gray-600')}`}>{l}</button>
+        ))}
+        {halves.length>1&&(<>{<span className={`text-xs ${th.muted} flex items-center px-1`}>|</span>}{['all',...halves.map(String)].map(h=>(
+          <button key={h} onClick={()=>setHalfFilter(h)} className={`px-3 py-1 rounded-lg text-xs font-medium ${halfFilter===h?'bg-teal-600 text-white':(darkMode?'bg-gray-700 text-gray-300':'bg-gray-200 text-gray-600')}`}>{h==='all'?'All Halves':`Half ${h}`}</button>
+        ))}</>)}
+      </div>
+      <div className="rounded-xl overflow-hidden shadow-xl mb-3"><PitchSVG>{shots.map((shot,i)=><ShotMarker key={i} shot={shot} i={i}/>)}</PitchSVG></div>
+      <div className="flex gap-5 justify-center text-xs mb-4">
+        <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full bg-green-500"/> Goal</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-500"/> Saved</span>
+        <span className="flex items-center gap-1.5 text-red-500 font-bold">✕ Off Target</span>
+      </div>
+      {shots.length>0&&(
+        <div className={`${th.card} rounded-xl shadow p-3`}>
+          <h3 className="font-bold mb-2 text-sm">Shot Log ({shots.length})</h3>
+          <div className="space-y-1 max-h-60 overflow-y-auto">
+            {shots.map((shot,i)=>(
+              <div key={i} className={`flex items-center gap-2 text-xs py-1.5 border-b ${th.border}`}>
+                <span>{shot.type==='Gol'?'⚽':shot.type==='SoT'?'🟡':'❌'}</span>
+                <span className="font-medium flex-1">{shot.playerName}</span>
+                <span className={`${th.muted} flex-shrink-0`}>H{shot.half}</span>
+                <span className={`${th.muted} flex-shrink-0`}>{shot.x!=null?`(${Math.round(shot.x)},${Math.round(shot.y)})`:'no loc'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {shots.length===0&&<div className={`${th.card} rounded-xl p-8 text-center ${th.muted}`}>No shots recorded.</div>}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════ MOUNT ════════════════════════════════════ */
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(<SoccerStatsApp/>);
+</script>
+</body>
+</html>
