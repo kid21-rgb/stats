@@ -48,6 +48,7 @@ const BasketballStatsApp = () => {
   const [gameLog, setGameLog] = useState([]);
   const [filterPeriod, setFilterPeriod] = useState('Total');
   const [lastStat, setLastStat] = useState(null);
+  const [toast, setToast] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
   const [shotChartPopup, setShotChartPopup] = useState(null);
   const [viewingShotChart, setViewingShotChart] = useState(null);
@@ -114,6 +115,12 @@ const BasketballStatsApp = () => {
     };
     loadDarkMode();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const toggleDarkMode = async () => {
     const newMode = !darkMode;
@@ -463,11 +470,13 @@ const BasketballStatsApp = () => {
     offRebPossessionRef.current = null;
   };
 
-  const processPossession = (isOpponent, statType, updatedGame, skipPossession = false) => {
+  const processPossession = (isOpponent, statType, updatedGame, skipPossession = false, jbPossTeam = null) => {
     if (skipPossession) {
       if (statType === 'FTMade') currentPossPointsRef.current += 1;
       return;
     }
+    // These stats never end a possession — don't touch possession state
+    if (statType === 'Blk' || statType === 'Ast' || statType === 'Foul') return;
     const currentTeam = isOpponent ? 'them' : 'us';
     const pending = pendingPossRef.current;
     let pendingResolved = false;
@@ -508,7 +517,7 @@ const BasketballStatsApp = () => {
       else if (statType === 'DefReb') { commitPossession(updatedGame); startPossession(currentTeam); }
       else if (statType === '2ptMiss' || statType === '3ptMiss') { pendingPossRef.current = { type: 'fgMiss', forTeam: currentTeam }; }
       else if (statType === 'Stl') { commitPossession(updatedGame); startPossession('us'); }
-      else if (statType === 'ForceJB' || statType === 'ConcedeJB') { commitPossession(updatedGame); startPossession(possTeamRef.current); }
+      else if (statType === 'ForceJB' || statType === 'ConcedeJB') { commitPossession(updatedGame); startPossession(jbPossTeam || possTeamRef.current); }
     }
   };
 
@@ -617,18 +626,18 @@ const BasketballStatsApp = () => {
         }
         updRots[ri] = { ...updRots[ri], plusMinus: updRots[ri].plusMinus + rPm, rebDiff: updRots[ri].rebDiff + rReb, toDiff: updRots[ri].toDiff + rTo, teamFGMade: updRots[ri].teamFGMade + rTFGM, teamFGAtt: updRots[ri].teamFGAtt + rTFGA, oppFGMade: updRots[ri].oppFGMade + rOFGM, oppFGAtt: updRots[ri].oppFGAtt + rOFGA };
         rotationsRef.current = updRots;
-        setRotations(updRots);
         rotDeltas = { rPm, rReb, rTo, rTFGM, rTFGA, rOFGM, rOFGA };
       }
     }
 
-    const mainEntry = { time: Date.now(), period: currentPeriod, playerIndex, statType, text: displayText };
+    const mainEntry = { time: Date.now(), period: currentPeriod, playerIndex, statType, text: displayText, prePossState: { team: possTeamRef.current, pending: pendingPossRef.current } };
     if (pmDelta !== 0) { mainEntry.pmDelta = pmDelta; mainEntry.pmPlayers = pmPlayers; }
     if (rotDeltas) { mainEntry.rotKey = rotKey; mainEntry.rotDeltas = rotDeltas; if (rotTriggeredCount) mainEntry.rotTriggeredCount = true; }
     newLog = [mainEntry, ...newLog];
 
     setGameLog(newLog);
     setLastStat({ text: displayText });
+    setToast(displayText);
 
     // Auto-reciprocal: our player Steal → opponent Live TO
     if (!isOpponent && statType === 'Stl') {
@@ -668,8 +677,16 @@ const BasketballStatsApp = () => {
       if (!player.periodStats[currentPeriod]) player.periodStats[currentPeriod] = {};
       player.periodStats[currentPeriod][ftKey] = (player.periodStats[currentPeriod][ftKey] || 0) + 1;
     }
+    // Store opponent FT categories
+    if (isOpponent && statType === 'FTMade' && extras.scoreCategory) {
+      const ftKey = extras.scoreCategory === 'Transition' ? 'FTMade_T' : extras.scoreCategory === 'HalfCourt' ? 'FTMade_H' : extras.scoreCategory === 'Technical' ? 'FTMade_Tech' : 'FTMade_2C';
+      updatedGame.opponent.stats[ftKey] = (updatedGame.opponent.stats[ftKey] || 0) + 1;
+      if (!updatedGame.opponent.periodStats[currentPeriod]) updatedGame.opponent.periodStats[currentPeriod] = {};
+      updatedGame.opponent.periodStats[currentPeriod][ftKey] = (updatedGame.opponent.periodStats[currentPeriod][ftKey] || 0) + 1;
+    }
 
-    processPossession(isOpponent, statType, updatedGame, extras.skipPossession || false);
+    processPossession(isOpponent, statType, updatedGame, extras.skipPossession || false, extras.jbPossTeam ?? null);
+    setRotations([...rotationsRef.current]);
     setCurrentGame(updatedGame);
   };
 
@@ -746,6 +763,11 @@ const BasketballStatsApp = () => {
     setGameLog(newLog);
     setCurrentGame(updatedGame);
     setLastStat(newLog.length > 0 ? { text: newLog[0].text } : null);
+    if (lastEntry.prePossState) {
+      possTeamRef.current = lastEntry.prePossState.team;
+      setPossTeam(lastEntry.prePossState.team);
+      pendingPossRef.current = lastEntry.prePossState.pending;
+    }
   };
 
   const deleteStatAtIndex = (index) => {
@@ -846,7 +868,20 @@ const BasketballStatsApp = () => {
     }
 
     // Update rotation data for the current lineup
-    const rotKey = currentRotationKeyRef.current;
+    // Find the rotation active at insert point. Log is newest-first (higher index = older).
+    // Scan newer entries first (lower index) — these reflect the lineup AFTER any recent sub.
+    // Then scan older entries, stopping at a Sub entry (which marks a lineup boundary).
+    let rotKey = null;
+    for (let i = insertIdx - 1; i >= 0; i--) {
+      if (newLog[i].rotKey) { rotKey = newLog[i].rotKey; break; }
+    }
+    if (!rotKey) {
+      for (let i = insertIdx + 1; i < newLog.length; i++) {
+        if (newLog[i].statType === 'Sub') break;
+        if (newLog[i].rotKey) { rotKey = newLog[i].rotKey; break; }
+      }
+    }
+    if (!rotKey) rotKey = currentRotationKeyRef.current;
     if (rotKey && statType !== 'endPeriod') {
       let rPm = 0, rReb = 0, rTo = 0, rTFGM = 0, rTFGA = 0, rOFGM = 0, rOFGA = 0;
       if (statType === '2ptMade') rPm = isOpponent ? -2 : 2;
@@ -904,7 +939,13 @@ const BasketballStatsApp = () => {
       const updatedGame = { ...currentGame };
       commitPossession(updatedGame);
       pendingPossRef.current = null;
-      const nextPossTeam = possTeamRef.current === 'us' ? 'them' : 'us';
+      let nextPossTeam;
+      if (jumpBallArrowRef.current !== null) {
+        nextPossTeam = jumpBallArrowRef.current;
+        jumpBallArrowRef.current = nextPossTeam === 'us' ? 'them' : 'us';
+      } else {
+        nextPossTeam = possTeamRef.current === 'us' ? 'them' : 'us';
+      }
       startPossession(nextPossTeam);
       setCurrentGame(updatedGame);
       const endPeriodText = `End Period ${currentPeriod}`;
@@ -1040,7 +1081,7 @@ const BasketballStatsApp = () => {
   };
 
   const StatButton = ({ label, onClick, color = 'bg-blue-500', wide = false, shooting = false, narrowShoot = false, tall = false }) => (
-    <button onClick={onClick} className={`${color} hover:opacity-80 text-white text-xs ${narrowShoot ? 'px-1 sm:px-4' : shooting ? 'px-2 sm:px-6' : wide ? 'px-1.5 sm:px-4' : 'px-1 sm:px-2'} ${tall ? 'py-2 sm:py-3' : 'py-1.5'} rounded font-medium`}>{label}</button>
+    <button onClick={onClick} className={`${color} hover:opacity-80 text-white text-sm ${narrowShoot ? 'px-1 sm:px-2' : shooting ? 'px-2 sm:px-6' : wide ? 'px-1.5 sm:px-4' : 'px-1 sm:px-2'} ${tall ? 'py-5 sm:py-6' : 'py-4'} rounded font-medium`}>{label}</button>
   );
 
   if (screen === 'home') return <HomeScreen onNewGame={() => setScreen('setup')} onViewGames={() => setScreen('viewGames')} darkMode={darkMode} toggleDarkMode={toggleDarkMode} theme={theme} onExportGames={exportAllGames} onImportGames={importGamesFromFile} />;
@@ -1115,8 +1156,8 @@ const BasketballStatsApp = () => {
           <div className="grid grid-cols-12 gap-0.5 sm:gap-1">
             {/* Left: Shots */}
             <div className="col-span-4 flex gap-0.5 sm:gap-1 items-stretch">
-              <button onClick={() => handleOpponentScore('2ptMade')} className="bg-green-600 hover:opacity-80 text-white text-xs px-1.5 sm:px-5 rounded font-medium self-stretch">2PM</button>
-              <button onClick={() => recordStat('opponent', '2ptMiss')} className="bg-red-600 hover:opacity-80 text-white text-xs px-1.5 sm:px-5 rounded font-medium self-stretch">2PX</button>
+              <button onClick={() => handleOpponentScore('2ptMade')} className="bg-green-600 hover:opacity-80 text-white text-sm px-1.5 sm:px-3 rounded font-medium self-stretch">2PM</button>
+              <button onClick={() => recordStat('opponent', '2ptMiss')} className="bg-red-600 hover:opacity-80 text-white text-sm px-1.5 sm:px-3 rounded font-medium self-stretch">2PX</button>
               <div className="flex flex-col gap-0.5 sm:gap-1">
                 <StatButton label="3PM" onClick={() => handleOpponentScore('3ptMade')} color="bg-green-700" narrowShoot />
                 <StatButton label="3PX" onClick={() => recordStat('opponent', '3ptMiss')} color="bg-red-700" narrowShoot />
@@ -1145,8 +1186,8 @@ const BasketballStatsApp = () => {
                 <StatButton label="LTO" onClick={() => recordStat('opponent', 'LiveTO')} color="bg-gray-600" shooting />
                 <StatButton label="DTO" onClick={() => recordStat('opponent', 'DeadTO')} color="bg-gray-500" shooting />
               </div>
-              <button onClick={() => recordStat('opponent', 'OffReb')} className="bg-yellow-600 hover:opacity-80 text-white text-xs px-1 sm:px-3 rounded font-medium self-stretch">OR</button>
-              <button onClick={() => recordStat('opponent', 'DefReb')} className="bg-yellow-700 hover:opacity-80 text-white text-xs px-1 sm:px-3 rounded font-medium self-stretch">DR</button>
+              <button onClick={() => recordStat('opponent', 'OffReb')} className="bg-yellow-600 hover:opacity-80 text-white text-sm px-1 sm:px-3 rounded font-medium self-stretch">OR</button>
+              <button onClick={() => recordStat('opponent', 'DefReb')} className="bg-yellow-700 hover:opacity-80 text-white text-sm px-1 sm:px-3 rounded font-medium self-stretch">DR</button>
             </div>
           </div>
         </div>
@@ -1179,8 +1220,8 @@ const BasketballStatsApp = () => {
               <div className="grid grid-cols-12 gap-0.5 sm:gap-1">
                 {/* Left: Shots */}
                 <div className="col-span-4 flex gap-0.5 sm:gap-1 items-stretch">
-                  <button onClick={() => handleFieldGoalClick(player.originalIndex, '2ptMade')} className="bg-green-600 hover:opacity-80 text-white text-xs px-1.5 sm:px-5 rounded font-medium self-stretch">2PM</button>
-                  <button onClick={() => handleFieldGoalClick(player.originalIndex, '2ptMiss')} className="bg-red-600 hover:opacity-80 text-white text-xs px-1.5 sm:px-5 rounded font-medium self-stretch">2PX</button>
+                  <button onClick={() => handleFieldGoalClick(player.originalIndex, '2ptMade')} className="bg-green-600 hover:opacity-80 text-white text-sm px-1.5 sm:px-3 rounded font-medium self-stretch">2PM</button>
+                  <button onClick={() => handleFieldGoalClick(player.originalIndex, '2ptMiss')} className="bg-red-600 hover:opacity-80 text-white text-sm px-1.5 sm:px-3 rounded font-medium self-stretch">2PX</button>
                   <div className="flex flex-col gap-0.5 sm:gap-1">
                     <StatButton label="3PM" onClick={() => handleFieldGoalClick(player.originalIndex, '3ptMade')} color="bg-green-700" narrowShoot />
                     <StatButton label="3PX" onClick={() => handleFieldGoalClick(player.originalIndex, '3ptMiss')} color="bg-red-700" narrowShoot />
@@ -1209,8 +1250,8 @@ const BasketballStatsApp = () => {
                     <StatButton label="LTO" onClick={() => recordStat(player.originalIndex, 'LiveTO')} color="bg-gray-600" shooting />
                     <StatButton label="DTO" onClick={() => recordStat(player.originalIndex, 'DeadTO')} color="bg-gray-500" shooting />
                   </div>
-                  <button onClick={() => recordStat(player.originalIndex, 'OffReb')} className="bg-yellow-600 hover:opacity-80 text-white text-xs px-1 sm:px-3 rounded font-medium self-stretch">OR</button>
-                  <button onClick={() => recordStat(player.originalIndex, 'DefReb')} className="bg-yellow-700 hover:opacity-80 text-white text-xs px-1 sm:px-3 rounded font-medium self-stretch">DR</button>
+                  <button onClick={() => recordStat(player.originalIndex, 'OffReb')} className="bg-yellow-600 hover:opacity-80 text-white text-sm px-1 sm:px-3 rounded font-medium self-stretch">OR</button>
+                  <button onClick={() => recordStat(player.originalIndex, 'DefReb')} className="bg-yellow-700 hover:opacity-80 text-white text-sm px-1 sm:px-3 rounded font-medium self-stretch">DR</button>
                 </div>
               </div>
             </div>
@@ -1237,7 +1278,7 @@ const BasketballStatsApp = () => {
                     <line x1="0" y1="19" x2="19" y2="19" stroke="#fff" strokeWidth="0.2"/>
                     <line x1="0" y1="31" x2="19" y2="31" stroke="#fff" strokeWidth="0.2"/>
                   </svg>
-                  <div className="absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-1 rounded">Tap where shot was taken</div>
+                  <div className="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-1 rounded">Tap where shot was taken</div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1385,6 +1426,11 @@ const BasketballStatsApp = () => {
             </div>
           </div>
         )}
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-lg max-w-xs text-center pointer-events-none">
+            {toast}
+          </div>
+        )}
       </div>
     );
   }
@@ -1431,7 +1477,7 @@ const RotationsScreen = ({ game, rotations, onBack, darkMode, theme, autoDownloa
     const headers = ['Rotation #', 'Lineup', 'Poss', 'ORate', 'DRate', 'NetRate', '+/-', 'REB±', 'TO±', 'Team FG%', 'Opp FG%'];
     const rows = [`${game.teamName} — Rotations`, `${game.date}`, '', headers.join(',')];
     sorted.forEach((rot, idx) => {
-      const lineup = rot.players.map(i => getPlayerName(i)).join(' / ');
+      const lineup = rot.players.map(i => { const p = game.players[i]; return p ? `#${p.number} ${p.name}` : `Player ${i}`; }).join(' / ');
       rows.push([idx + 1, `"${lineup}"`, getTotalPoss(rot), getORate(rot), getDRate(rot), getNetRate(rot), rot.plusMinus >= 0 ? `+${rot.plusMinus}` : rot.plusMinus, rot.rebDiff >= 0 ? `+${rot.rebDiff}` : rot.rebDiff, rot.toDiff >= 0 ? `+${rot.toDiff}` : rot.toDiff, `"${fgPct(rot.teamFGMade, rot.teamFGAtt)}"`, `"${fgPct(rot.oppFGMade, rot.oppFGAtt)}"`].join(','));
     });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -1581,7 +1627,7 @@ const GameSetup = ({ onStart, onBack, games, darkMode, theme }) => {
         <div className="flex gap-3">
           <div className="flex-1">
             <label className={`block text-xs font-medium mb-1 ${theme.textMuted}`}>Number of Periods</label>
-            <input type="number" min="1" max="10" value={numPeriods} onChange={(e) => setNumPeriods(e.target.value)} className={`w-full p-3 border rounded ${theme.inputBg} ${theme.border}`} />
+            <input type="number" min="1" max="8" value={numPeriods} onChange={(e) => setNumPeriods(e.target.value)} className={`w-full p-3 border rounded ${theme.inputBg} ${theme.border}`} />
           </div>
           <div className="flex-1">
             <label className={`block text-xs font-medium mb-1 ${theme.textMuted}`}>Minutes per Period</label>
@@ -2696,6 +2742,18 @@ const SummaryView = ({ game, log, rotations, onBack, onStatEntry, onBoxScore, on
 
   // Off/Def ratings
   const computeRatings = () => {
+    if (filterPeriod === 'Total' && rotations && rotations.length > 0) {
+      let ourPossTotal = 0, oppPossTotal = 0, ourPtsTotal = 0, oppPtsTotal = 0;
+      rotations.forEach(rot => {
+        ourPossTotal += rot.offPoss || 0;
+        oppPossTotal += rot.defPoss || 0;
+        ourPtsTotal += rot.offPoints || 0;
+        oppPtsTotal += rot.defPoints || 0;
+      });
+      const oRate = ourPossTotal > 0 ? parseFloat((ourPtsTotal / ourPossTotal * 100).toFixed(1)) : null;
+      const dRate = oppPossTotal > 0 ? parseFloat((oppPtsTotal / oppPossTotal * 100).toFixed(1)) : null;
+      return { ourORate: oRate, ourDRate: dRate, oppORate: dRate, oppDRate: oRate, ourPoss: ourPossTotal, oppPoss: oppPossTotal };
+    }
     const t = teamTotals;
     const o = oppStats;
     const ourFGA = (t['2ptMade'] || 0) + (t['2ptMiss'] || 0) + (t['3ptMade'] || 0) + (t['3ptMiss'] || 0);
@@ -2710,9 +2768,7 @@ const SummaryView = ({ game, log, rotations, onBack, onStatEntry, onBoxScore, on
     const oppPoss = oppFGAx + oppTO + 0.44 * oppFTAx - oppOReb;
     const oRate = ourPoss > 0 ? parseFloat((teamPts / ourPoss * 100).toFixed(1)) : null;
     const dRate = oppPoss > 0 ? parseFloat((oppPts / oppPoss * 100).toFixed(1)) : null;
-    const oppORate = oppPoss > 0 ? parseFloat((oppPts / oppPoss * 100).toFixed(1)) : null;
-    const oppDRate = ourPoss > 0 ? parseFloat((teamPts / ourPoss * 100).toFixed(1)) : null;
-    return { ourORate: oRate, ourDRate: dRate, oppORate, oppDRate, ourPoss: Math.round(ourPoss), oppPoss: Math.round(oppPoss) };
+    return { ourORate: oRate, ourDRate: dRate, oppORate: dRate, oppDRate: oRate, ourPoss: Math.round(ourPoss), oppPoss: Math.round(oppPoss) };
   };
   const { ourORate, ourDRate, oppORate, oppDRate, ourPoss, oppPoss } = computeRatings();
 
@@ -2723,9 +2779,8 @@ const SummaryView = ({ game, log, rotations, onBack, onStatEntry, onBoxScore, on
     const actualMins = filterPeriod === 'Total' ? minsPerGame : minsPerPeriod;
     const totalPoss = ourPoss + oppPoss;
     if (totalPoss === 0 || actualMins === 0) return null;
-    // Pace = total possessions (both teams) extrapolated to full game length
-    // Comparable to NBA pace (both teams' possessions per 48 min): use game's own regulation time
-    return Math.round((totalPoss / actualMins) * minsPerGame);
+    // Pace = total possessions (both teams) per 48 minutes
+    return Math.round((totalPoss / 2) * (48 / actualMins));
   };
   const pace = computePace();
 
@@ -2892,6 +2947,7 @@ const SummaryView = ({ game, log, rotations, onBack, onStatEntry, onBoxScore, on
             <div className={`w-24 text-center shrink-0`}>
               <span className={`text-xs font-medium ${theme.textMuted}`}>PACE </span>
               <span className="text-sm font-bold">{pace}</span>
+              <span className={`text-xs ${theme.textMuted}`}>/48</span>
             </div>
             <div className="flex-1" />
           </div>
